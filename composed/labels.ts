@@ -1,0 +1,234 @@
+/**
+ * Gmail Toolkit — Label Cache + Composed Label Operations
+ *
+ * The LabelCache is used by all composed read operations to resolve
+ * label IDs to human-readable names without repeated API calls.
+ */
+
+import { GmailClient } from '../client/index.js';
+import type { LabelDetail, LabelOverview } from '../types.js';
+
+// ---------------------------------------------------------------------------
+// Label Cache
+// ---------------------------------------------------------------------------
+
+export class LabelCache {
+  private idToName = new Map<string, string>();
+  private nameToId = new Map<string, string>();
+  private initialized = false;
+
+  constructor(private client: GmailClient) {}
+
+  /**
+   * Resolve label IDs to human-readable names.
+   */
+  async resolve(labelIds: string[]): Promise<string[]> {
+    await this.ensureLoaded();
+    return labelIds.map((id) => this.idToName.get(id) ?? id);
+  }
+
+  /**
+   * Look up a label ID by name (case-insensitive).
+   */
+  async lookup(labelName: string): Promise<string | null> {
+    await this.ensureLoaded();
+    return this.nameToId.get(labelName.toUpperCase()) ?? null;
+  }
+
+  /**
+   * Look up multiple label names, returning their IDs.
+   * Throws if any label name is not found.
+   */
+  async lookupMany(labelNames: string[]): Promise<string[]> {
+    const ids: string[] = [];
+    for (const name of labelNames) {
+      const id = await this.lookup(name);
+      if (!id) {
+        throw new Error(`Label not found: "${name}"`);
+      }
+      ids.push(id);
+    }
+    return ids;
+  }
+
+  /**
+   * Force reload on next access (call after label mutations).
+   */
+  invalidate(): void {
+    this.initialized = false;
+    this.idToName.clear();
+    this.nameToId.clear();
+  }
+
+  /**
+   * Get all cached labels (loads if needed).
+   */
+  async getAll(): Promise<Map<string, string>> {
+    await this.ensureLoaded();
+    return new Map(this.idToName);
+  }
+
+  private async ensureLoaded(): Promise<void> {
+    if (this.initialized) return;
+
+    const labels = await this.client.labels.list();
+    for (const label of labels) {
+      if (label.id && label.name) {
+        this.idToName.set(label.id, label.name);
+        this.nameToId.set(label.name.toUpperCase(), label.id);
+      }
+    }
+    this.initialized = true;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Composed Label Operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Get comprehensive label overview with counts.
+ * Fetches individual counts only for user labels (not system labels).
+ */
+export async function getLabels(
+  client: GmailClient,
+  labelCache: LabelCache,
+): Promise<LabelOverview> {
+  const allLabels = await client.labels.list();
+
+  // Classify labels
+  const systemLabels: typeof allLabels = [];
+  const userLabels: typeof allLabels = [];
+  const categories: typeof allLabels = [];
+
+  for (const label of allLabels) {
+    const name = label.name ?? '';
+    if (name.startsWith('CATEGORY_')) {
+      categories.push(label);
+    } else if (label.type === 'user') {
+      userLabels.push(label);
+    } else {
+      systemLabels.push(label);
+    }
+  }
+
+  // Fetch accurate counts for user labels only (batched)
+  const userLabelIds = userLabels.map((l) => l.id!).filter(Boolean);
+  const detailedUserLabels = userLabelIds.length > 0
+    ? await client.labels.batchGet(userLabelIds)
+    : [];
+
+  // Build response
+  const toDetail = (label: typeof allLabels[0], detailed?: typeof allLabels[0]): LabelDetail => {
+    const source = detailed ?? label;
+    return {
+      id: source.id ?? '',
+      name: source.name ?? '',
+      type: source.type === 'user' ? 'user' : 'system',
+      messages_total: source.messagesTotal ?? 0,
+      messages_unread: source.messagesUnread ?? 0,
+      threads_total: source.threadsTotal ?? 0,
+      threads_unread: source.threadsUnread ?? 0,
+      color: source.color
+        ? { text: source.color.textColor ?? '', background: source.color.backgroundColor ?? '' }
+        : null,
+      visibility: source.labelListVisibility ?? 'labelShow',
+    };
+  };
+
+  // Map detailed user labels by ID for easy lookup
+  const detailedMap = new Map(detailedUserLabels.map((l) => [l.id, l]));
+
+  const userLabelDetails = userLabels.map((l) => toDetail(l, detailedMap.get(l.id!)));
+  const emptyLabels = userLabelDetails
+    .filter((l) => l.messages_total === 0)
+    .map((l) => l.name);
+  const mostActive = userLabelDetails.reduce(
+    (max, l) => (l.messages_total > (max?.messages_total ?? 0) ? l : max),
+    userLabelDetails[0],
+  );
+
+  // Refresh cache since we just fetched all labels
+  labelCache.invalidate();
+
+  return {
+    system_labels: systemLabels.map((l) => toDetail(l)),
+    user_labels: userLabelDetails,
+    categories: categories.map((l) => toDetail(l)),
+    summary: {
+      total_user_labels: userLabelDetails.length,
+      empty_labels: emptyLabels,
+      most_active: mostActive?.name ?? '',
+    },
+  };
+}
+
+/**
+ * Create a new label.
+ */
+export async function createLabel(
+  client: GmailClient,
+  labelCache: LabelCache,
+  name: string,
+  options?: { color?: { text: string; background: string } },
+): Promise<LabelDetail> {
+  const created = await client.labels.create(name, {
+    color: options?.color
+      ? { textColor: options.color.text, backgroundColor: options.color.background }
+      : undefined,
+  });
+
+  labelCache.invalidate();
+
+  return {
+    id: created.id ?? '',
+    name: created.name ?? '',
+    type: 'user',
+    messages_total: 0,
+    messages_unread: 0,
+    threads_total: 0,
+    threads_unread: 0,
+    color: created.color
+      ? { text: created.color.textColor ?? '', background: created.color.backgroundColor ?? '' }
+      : null,
+    visibility: created.labelListVisibility ?? 'labelShow',
+  };
+}
+
+/**
+ * Update an existing label (by name or ID).
+ */
+export async function updateLabel(
+  client: GmailClient,
+  labelCache: LabelCache,
+  nameOrId: string,
+  updates: { new_name?: string; color?: { text: string; background: string } },
+): Promise<LabelDetail> {
+  // Resolve name to ID if needed
+  let id = nameOrId;
+  const resolvedId = await labelCache.lookup(nameOrId);
+  if (resolvedId) id = resolvedId;
+
+  const updated = await client.labels.update(id, {
+    name: updates.new_name,
+    color: updates.color
+      ? { textColor: updates.color.text, backgroundColor: updates.color.background }
+      : undefined,
+  });
+
+  labelCache.invalidate();
+
+  return {
+    id: updated.id ?? '',
+    name: updated.name ?? '',
+    type: updated.type === 'user' ? 'user' : 'system',
+    messages_total: updated.messagesTotal ?? 0,
+    messages_unread: updated.messagesUnread ?? 0,
+    threads_total: updated.threadsTotal ?? 0,
+    threads_unread: updated.threadsUnread ?? 0,
+    color: updated.color
+      ? { text: updated.color.textColor ?? '', background: updated.color.backgroundColor ?? '' }
+      : null,
+    visibility: updated.labelListVisibility ?? 'labelShow',
+  };
+}
