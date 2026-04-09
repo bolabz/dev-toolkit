@@ -5,22 +5,32 @@
  * label IDs to human-readable names without repeated API calls.
  */
 
-import { GmailClient } from '../client/index.js';
+import type { GmailClient } from '../client/index.js';
 import type { LabelDetail, LabelOverview } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Label Cache
 // ---------------------------------------------------------------------------
 
+/**
+ * Caches Gmail label ID-to-name mappings to avoid repeated API calls.
+ * Used by all composed read operations to resolve label IDs to human-readable names.
+ */
 export class LabelCache {
-  private idToName = new Map<string, string>();
-  private nameToId = new Map<string, string>();
+  private readonly idToName = new Map<string, string>();
+  private readonly nameToId = new Map<string, string>();
   private initialized = false;
 
-  constructor(private client: GmailClient) {}
+  /**
+   * Create a LabelCache backed by the given Gmail client.
+   * @param client - The authenticated Gmail API client for fetching labels
+   */
+  constructor(private readonly client: GmailClient) {}
 
   /**
    * Resolve label IDs to human-readable names.
+   * @param labelIds - The Gmail label IDs to resolve to names
+   * @returns The resolved label names (falls back to raw ID if not found)
    */
   async resolve(labelIds: string[]): Promise<string[]> {
     await this.ensureLoaded();
@@ -29,6 +39,8 @@ export class LabelCache {
 
   /**
    * Look up a label ID by name (case-insensitive).
+   * @param labelName - The label name to look up (case-insensitive)
+   * @returns The label ID if found, or null
    */
   async lookup(labelName: string): Promise<string | null> {
     await this.ensureLoaded();
@@ -38,12 +50,14 @@ export class LabelCache {
   /**
    * Look up multiple label names, returning their IDs.
    * Throws if any label name is not found.
+   * @param labelNames - The label names to resolve to IDs
+   * @returns The resolved label IDs in the same order as the input names
    */
   async lookupMany(labelNames: string[]): Promise<string[]> {
     const ids: string[] = [];
     for (const name of labelNames) {
       const id = await this.lookup(name);
-      if (!id) {
+      if (id == null) {
         throw new Error(`Label not found: "${name}"`);
       }
       ids.push(id);
@@ -62,6 +76,7 @@ export class LabelCache {
 
   /**
    * Get all cached labels (loads if needed).
+   * @returns A Map of label ID to label name
    */
   async getAll(): Promise<Map<string, string>> {
     await this.ensureLoaded();
@@ -73,7 +88,7 @@ export class LabelCache {
 
     const labels = await this.client.labels.list();
     for (const label of labels) {
-      if (label.id && label.name) {
+      if (label.id != null && label.name != null) {
         this.idToName.set(label.id, label.name);
         this.nameToId.set(label.name.toUpperCase(), label.id);
       }
@@ -89,6 +104,9 @@ export class LabelCache {
 /**
  * Get comprehensive label overview with counts.
  * Fetches individual counts only for user labels (not system labels).
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @returns A comprehensive overview of all labels with counts and summaries
  */
 export async function getLabels(
   client: GmailClient,
@@ -113,13 +131,15 @@ export async function getLabels(
   }
 
   // Fetch accurate counts for user labels only (batched)
-  const userLabelIds = userLabels.map((l) => l.id!).filter(Boolean);
-  const detailedUserLabels = userLabelIds.length > 0
-    ? await client.labels.batchGet(userLabelIds)
-    : [];
+  const userLabelIds = userLabels.map((l) => l.id ?? '').filter((id) => id !== '');
+  const detailedUserLabels =
+    userLabelIds.length > 0 ? await client.labels.batchGet(userLabelIds) : [];
 
   // Build response
-  const toDetail = (label: typeof allLabels[0], detailed?: typeof allLabels[0]): LabelDetail => {
+  const toDetail = (
+    label: (typeof allLabels)[0],
+    detailed?: (typeof allLabels)[0],
+  ): LabelDetail => {
     const source = detailed ?? label;
     return {
       id: source.id ?? '',
@@ -139,12 +159,10 @@ export async function getLabels(
   // Map detailed user labels by ID for easy lookup
   const detailedMap = new Map(detailedUserLabels.map((l) => [l.id, l]));
 
-  const userLabelDetails = userLabels.map((l) => toDetail(l, detailedMap.get(l.id!)));
-  const emptyLabels = userLabelDetails
-    .filter((l) => l.messages_total === 0)
-    .map((l) => l.name);
+  const userLabelDetails = userLabels.map((l) => toDetail(l, detailedMap.get(l.id)));
+  const emptyLabels = userLabelDetails.filter((l) => l.messages_total === 0).map((l) => l.name);
   const mostActive = userLabelDetails.reduce(
-    (max, l) => (l.messages_total > (max?.messages_total ?? 0) ? l : max),
+    (max, l) => (l.messages_total > max.messages_total ? l : max),
     userLabelDetails[0],
   );
 
@@ -158,13 +176,21 @@ export async function getLabels(
     summary: {
       total_user_labels: userLabelDetails.length,
       empty_labels: emptyLabels,
-      most_active: mostActive?.name ?? '',
+      most_active: mostActive.name,
     },
   };
 }
 
 /**
  * Create a new label.
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @param name - The display name for the new label
+ * @param options - Optional settings including label color
+ * @param options.color - The label color configuration
+ * @param options.color.text - The text color hex code
+ * @param options.color.background - The background color hex code
+ * @returns The created label with its details
  */
 export async function createLabel(
   client: GmailClient,
@@ -197,6 +223,15 @@ export async function createLabel(
 
 /**
  * Update an existing label (by name or ID).
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @param nameOrId - The label name or ID to update
+ * @param updates - The fields to change
+ * @param updates.new_name - The new display name for the label
+ * @param updates.color - The new label color configuration
+ * @param updates.color.text - The text color hex code
+ * @param updates.color.background - The background color hex code
+ * @returns The updated label with its details
  */
 export async function updateLabel(
   client: GmailClient,
@@ -207,7 +242,9 @@ export async function updateLabel(
   // Resolve name to ID if needed
   let id = nameOrId;
   const resolvedId = await labelCache.lookup(nameOrId);
-  if (resolvedId) id = resolvedId;
+  if (resolvedId != null) {
+    id = resolvedId;
+  }
 
   const updated = await client.labels.update(id, {
     name: updates.new_name,

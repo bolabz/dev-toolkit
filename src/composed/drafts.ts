@@ -2,17 +2,28 @@
  * Gmail Toolkit — Draft Composed Operations
  */
 
-import { GmailClient } from '../client/index.js';
-import { LabelCache } from './labels.js';
-import { parseContact, parseContactList } from './helpers.js';
+import type { GmailClient } from '../client/index.js';
+import type { LabelCache } from './labels.js';
+import { parseContactList, parseDate, hasAttachments } from './helpers.js';
+import { processMessagePayload } from './body-processing.js';
 import type { DraftSummary, DraftDetail } from '../types.js';
 import he from 'he';
 
+/**
+ * List draft messages with optional body content.
+ * @param client - The authenticated Gmail API client
+ * @param _labelCache - The label cache (unused but kept for API consistency)
+ * @param maxResults - Maximum number of drafts to return
+ * @param query - Optional Gmail search query to filter drafts
+ * @param includeBody - Whether to include draft body text
+ * @returns A summary of matching drafts with metadata
+ */
 export async function getDrafts(
   client: GmailClient,
-  labelCache: LabelCache,
+  _labelCache: LabelCache,
   maxResults = 10,
   query?: string,
+  includeBody = false,
 ): Promise<DraftSummary> {
   const listResult = await client.drafts.list({ maxResults, query });
 
@@ -21,16 +32,29 @@ export async function getDrafts(
   }
 
   const ids = listResult.drafts.map((d) => d.id);
-  const rawDrafts = await client.drafts.batchGet(ids, 'metadata');
+  const format = includeBody ? 'full' : 'metadata';
+  const rawDrafts = await client.drafts.batchGet(ids, format);
 
-  const drafts: DraftDetail[] = rawDrafts.map((raw) => {
+  const drafts: DraftDetail[] = [];
+  for (const raw of rawDrafts) {
     const msg = raw.message;
     const headers = new Map<string, string>();
     for (const h of msg?.payload?.headers ?? []) {
-      if (h.name && h.value) headers.set(h.name, h.value);
+      if (h.name != null && h.value != null) {
+        headers.set(h.name, h.value);
+      }
     }
 
-    return {
+    let bodyText: string | null = null;
+    if (includeBody && msg?.payload) {
+      const { text } = await processMessagePayload(msg.payload, msg.payload.mimeType ?? undefined, {
+        stripReplies: false,
+        includeHtml: false,
+      });
+      bodyText = text;
+    }
+
+    drafts.push({
       draft_id: raw.id ?? '',
       message_id: msg?.id ?? '',
       thread_id: msg?.threadId ?? null,
@@ -40,15 +64,26 @@ export async function getDrafts(
       snippet: he.decode(msg?.snippet ?? ''),
       date: parseDate(headers.get('Date') ?? ''),
       size_bytes: msg?.sizeEstimate ?? 0,
-      has_attachments: hasAttachments(msg?.payload),
-    };
-  });
+      has_attachments: hasAttachments(msg?.payload, msg?.sizeEstimate),
+      body_text: bodyText,
+    });
+  }
 
   return { total: listResult.resultSizeEstimate, drafts };
 }
 
 /**
  * Create a new draft from structured input.
+ * @param client - The authenticated Gmail API client
+ * @param options - The draft composition options
+ * @param options.to - Recipient email address
+ * @param options.cc - CC recipient email addresses
+ * @param options.bcc - BCC recipient email addresses
+ * @param options.subject - The email subject line
+ * @param options.body - The email body content
+ * @param options.contentType - MIME type: 'text/plain' or 'text/html'
+ * @param options.threadId - Thread ID to associate the draft with a conversation
+ * @returns The created draft with message details
  */
 export async function createDraft(
   client: GmailClient,
@@ -69,7 +104,9 @@ export async function createDraft(
   const msg = draft.message;
   const headers = new Map<string, string>();
   for (const h of msg?.payload?.headers ?? []) {
-    if (h.name && h.value) headers.set(h.name, h.value);
+    if (h.name != null && h.value != null) {
+      headers.set(h.name, h.value);
+    }
   }
 
   return {
@@ -99,28 +136,20 @@ function buildRfc2822Message(options: {
   contentType?: string;
 }): string {
   const lines: string[] = [];
-  if (options.to) lines.push(`To: ${options.to}`);
-  if (options.cc) lines.push(`Cc: ${options.cc}`);
-  if (options.bcc) lines.push(`Bcc: ${options.bcc}`);
-  if (options.subject) lines.push(`Subject: ${options.subject}`);
+  if (options.to != null) {
+    lines.push(`To: ${options.to}`);
+  }
+  if (options.cc != null) {
+    lines.push(`Cc: ${options.cc}`);
+  }
+  if (options.bcc != null) {
+    lines.push(`Bcc: ${options.bcc}`);
+  }
+  if (options.subject != null) {
+    lines.push(`Subject: ${options.subject}`);
+  }
   lines.push(`Content-Type: ${options.contentType ?? 'text/plain'}; charset=utf-8`);
   lines.push('');
   lines.push(options.body);
   return lines.join('\r\n');
-}
-
-function parseDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toISOString();
-  } catch {
-    return dateStr;
-  }
-}
-
-function hasAttachments(payload: unknown): boolean {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const p = payload as any;
-  if (!p) return false;
-  if (p.filename && p.filename.length > 0 && p.body?.attachmentId) return true;
-  return (p.parts ?? []).some((part: unknown) => hasAttachments(part));
 }

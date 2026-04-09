@@ -13,6 +13,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import open from 'open';
+import { logger } from './logger.js';
+
+const log = logger.child('auth');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -55,7 +58,6 @@ interface InstalledCredentials {
  *   2. Token exists, refresh valid → silent auto-refresh (invisible, ~100ms)
  *   3. Token exists, refresh invalid → launch browser flow
  *   4. No token.json → launch browser flow
- *
  * @param credentialsPath - Path to Google OAuth credentials.json
  * @param tokenPath - Path to stored token.json (created automatically on first auth)
  * @returns Authenticated OAuth2Client ready for Gmail API calls
@@ -77,15 +79,16 @@ export async function ensureAuthenticated(
   // 2. Try loading existing token
   if (fs.existsSync(resolvedTokenPath)) {
     try {
-      const tokenData = JSON.parse(fs.readFileSync(resolvedTokenPath, 'utf-8'));
+      const tokenData = JSON.parse(fs.readFileSync(resolvedTokenPath, 'utf-8')) as Record<
+        string,
+        unknown
+      >;
       oauth2.setCredentials(tokenData);
       await oauth2.getAccessToken(); // forces refresh if expired
       return oauth2;
     } catch (err: unknown) {
       if (isInvalidGrant(err)) {
-        console.error(
-          '[gmail-toolkit] Saved authorization has expired. Re-authenticating...',
-        );
+        log.warn('Saved authorization has expired. Re-authenticating...');
         // Fall through to browser flow
       } else {
         throw err;
@@ -102,9 +105,7 @@ export async function ensureAuthenticated(
 // ---------------------------------------------------------------------------
 
 function createOAuth2Client(credentialsPath: string): OAuth2Client {
-  const raw = JSON.parse(
-    fs.readFileSync(credentialsPath, 'utf-8'),
-  ) as InstalledCredentials;
+  const raw = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8')) as InstalledCredentials;
 
   const { client_id, client_secret } = raw.installed;
   return new OAuth2Client(client_id, client_secret, REDIRECT_URI);
@@ -114,20 +115,15 @@ function createOAuth2Client(credentialsPath: string): OAuth2Client {
 // Browser Auth Flow
 // ---------------------------------------------------------------------------
 
-async function browserAuthFlow(
-  oauth2: OAuth2Client,
-  tokenPath: string,
-): Promise<OAuth2Client> {
+async function browserAuthFlow(oauth2: OAuth2Client, tokenPath: string): Promise<OAuth2Client> {
   const authUrl = oauth2.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     prompt: 'consent', // ensures we always get a refresh token
   });
 
-  // stderr — visible in terminal AND in MCP server logs
-  // (stdout is reserved for MCP protocol messages)
-  console.error('[gmail-toolkit] Authentication required. Opening browser for Google sign-in...');
-  console.error(`[gmail-toolkit] If browser doesn't open, visit:\n${authUrl}`);
+  log.info('Authentication required. Opening browser for Google sign-in...');
+  log.info(`If browser doesn't open, visit:\n${authUrl}`);
 
   // Open browser (cross-platform via 'open' package)
   await open(authUrl);
@@ -145,7 +141,7 @@ async function browserAuthFlow(
     fs.mkdirSync(tokenDir, { recursive: true });
   }
   fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
-  console.error('[gmail-toolkit] Authentication successful. Token saved.');
+  log.info('Authentication successful. Token saved.');
 
   return oauth2;
 }
@@ -157,6 +153,7 @@ async function browserAuthFlow(
 /**
  * Starts a temporary HTTP server on localhost to capture the OAuth redirect.
  * Automatically shuts down after receiving the authorization code or timing out.
+ * @returns The authorization code from the OAuth redirect
  */
 function waitForRedirect(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -172,7 +169,7 @@ function waitForRedirect(): Promise<string> {
       const code = url.searchParams.get('code');
       const error = url.searchParams.get('error');
 
-      if (error) {
+      if (error != null) {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(authResultPage(false, `Authorization denied: ${error}`));
         cleanup();
@@ -180,7 +177,7 @@ function waitForRedirect(): Promise<string> {
         return;
       }
 
-      if (!code) {
+      if (code == null) {
         res.writeHead(400, { 'Content-Type': 'text/html' });
         res.end(authResultPage(false, 'No authorization code received.'));
         cleanup();
@@ -189,17 +186,20 @@ function waitForRedirect(): Promise<string> {
       }
 
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(authResultPage(true, 'Gmail Toolkit authorized successfully! You can close this tab.'));
+      res.end(
+        authResultPage(true, 'Gmail Toolkit authorized successfully! You can close this tab.'),
+      );
       cleanup();
       resolve(code);
     });
 
     const timeout = setTimeout(() => {
       cleanup();
-      reject(new Error(
-        `OAuth authorization timed out after ${AUTH_TIMEOUT_MS / 1000}s. ` +
-        'Please try again.',
-      ));
+      reject(
+        new Error(
+          `OAuth authorization timed out after ${AUTH_TIMEOUT_MS / 1000}s. ` + 'Please try again.',
+        ),
+      );
     }, AUTH_TIMEOUT_MS);
 
     function cleanup() {
@@ -213,9 +213,11 @@ function waitForRedirect(): Promise<string> {
 
     server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
-        reject(new Error(
-          `Port ${REDIRECT_PORT} is in use. Close the application using it and try again.`,
-        ));
+        reject(
+          new Error(
+            `Port ${REDIRECT_PORT} is in use. Close the application using it and try again.`,
+          ),
+        );
       } else {
         reject(err);
       }
@@ -253,30 +255,30 @@ class MissingCredentialsError extends Error {
   constructor(resolvedPath: string) {
     super(
       `\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `  Gmail Toolkit: OAuth credentials not found\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `\n` +
-      `  Expected at: ${resolvedPath}\n` +
-      `\n` +
-      `  To set up credentials (one-time, ~5 minutes):\n` +
-      `\n` +
-      `  1. Create or select a Google Cloud project:\n` +
-      `     https://console.cloud.google.com/projectcreate\n` +
-      `\n` +
-      `  2. Enable the Gmail API:\n` +
-      `     https://console.cloud.google.com/apis/library/gmail.googleapis.com\n` +
-      `\n` +
-      `  3. Configure the OAuth consent screen:\n` +
-      `     https://console.cloud.google.com/apis/credentials/consent\n` +
-      `\n` +
-      `  4. Create an OAuth Client ID (select "Desktop app"):\n` +
-      `     https://console.cloud.google.com/apis/credentials/oauthclient\n` +
-      `\n` +
-      `  5. Download the JSON and save it to:\n` +
-      `     ${resolvedPath}\n` +
-      `\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  Gmail Toolkit: OAuth credentials not found\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        `  Expected at: ${resolvedPath}\n` +
+        `\n` +
+        `  To set up credentials (one-time, ~5 minutes):\n` +
+        `\n` +
+        `  1. Create or select a Google Cloud project:\n` +
+        `     https://console.cloud.google.com/projectcreate\n` +
+        `\n` +
+        `  2. Enable the Gmail API:\n` +
+        `     https://console.cloud.google.com/apis/library/gmail.googleapis.com\n` +
+        `\n` +
+        `  3. Configure the OAuth consent screen:\n` +
+        `     https://console.cloud.google.com/apis/credentials/consent\n` +
+        `\n` +
+        `  4. Create an OAuth Client ID (select "Desktop app"):\n` +
+        `     https://console.cloud.google.com/apis/credentials/oauthclient\n` +
+        `\n` +
+        `  5. Download the JSON and save it to:\n` +
+        `     ${resolvedPath}\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
     );
     this.name = 'MissingCredentialsError';
   }

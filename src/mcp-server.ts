@@ -15,7 +15,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 import { ensureAuthenticated } from './auth.js';
+import { logger } from './logger.js';
 import { GmailClient } from './client/index.js';
+
+const log = logger.child('mcp');
 import {
   LabelCache,
   search,
@@ -61,7 +64,7 @@ let labelCache: LabelCache;
 const toolRegistry = resolveToolRegistry();
 
 function isEnabled(name: ToolName): boolean {
-  return toolRegistry[name]?.enabled ?? false;
+  return toolRegistry[name].enabled;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,9 +79,15 @@ if (isEnabled('gmail_search')) {
       query: z.string().describe('Gmail search query (e.g., "is:unread from:chase")'),
       max_results: z.number().optional().describe('Max messages to return (default 20)'),
       page_token: z.string().optional().describe('Pagination token from previous search'),
+      include_body: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include processed body text per message (default false). Eliminates need for separate read calls.',
+        ),
     },
-    async ({ query, max_results, page_token }) => {
-      const result = await search(client, labelCache, query, max_results, page_token);
+    async ({ query, max_results, page_token, include_body }) => {
+      const result = await search(client, labelCache, query, max_results, page_token, include_body);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     },
   );
@@ -114,15 +123,10 @@ if (isEnabled('gmail_read_thread')) {
 }
 
 if (isEnabled('gmail_get_labels')) {
-  server.tool(
-    'gmail_get_labels',
-    toolRegistry.gmail_get_labels.description,
-    {},
-    async () => {
-      const result = await getLabels(client, labelCache);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    },
-  );
+  server.tool('gmail_get_labels', toolRegistry.gmail_get_labels.description, {}, async () => {
+    const result = await getLabels(client, labelCache);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+  });
 }
 
 if (isEnabled('gmail_get_drafts')) {
@@ -132,36 +136,30 @@ if (isEnabled('gmail_get_drafts')) {
     {
       max_results: z.number().optional().describe('Max drafts to return (default 10)'),
       query: z.string().optional().describe('Filter drafts by search query'),
+      include_body: z
+        .boolean()
+        .optional()
+        .describe('Include processed body text per draft (default false)'),
     },
-    async ({ max_results, query }) => {
-      const result = await getDrafts(client, labelCache, max_results, query);
+    async ({ max_results, query, include_body }) => {
+      const result = await getDrafts(client, labelCache, max_results, query, include_body);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     },
   );
 }
 
 if (isEnabled('gmail_get_filters')) {
-  server.tool(
-    'gmail_get_filters',
-    toolRegistry.gmail_get_filters.description,
-    {},
-    async () => {
-      const result = await getFilters(client, labelCache);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    },
-  );
+  server.tool('gmail_get_filters', toolRegistry.gmail_get_filters.description, {}, async () => {
+    const result = await getFilters(client, labelCache);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+  });
 }
 
 if (isEnabled('gmail_get_account')) {
-  server.tool(
-    'gmail_get_account',
-    toolRegistry.gmail_get_account.description,
-    {},
-    async () => {
-      const result = await getAccount(client);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    },
-  );
+  server.tool('gmail_get_account', toolRegistry.gmail_get_account.description, {}, async () => {
+    const result = await getAccount(client);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -174,10 +172,13 @@ if (isEnabled('gmail_create_label')) {
     toolRegistry.gmail_create_label.description,
     {
       name: z.string().describe('Label name (use "/" for nesting, e.g., "Finance/Banking")'),
-      color: z.object({
-        text: z.string(),
-        background: z.string(),
-      }).optional().describe('Label color'),
+      color: z
+        .object({
+          text: z.string(),
+          background: z.string(),
+        })
+        .optional()
+        .describe('Label color'),
     },
     async ({ name, color }) => {
       const result = await createLabel(client, labelCache, name, { color });
@@ -193,10 +194,13 @@ if (isEnabled('gmail_update_label')) {
     {
       label: z.string().describe('Label name or ID to update'),
       new_name: z.string().optional().describe('New name for the label'),
-      color: z.object({
-        text: z.string(),
-        background: z.string(),
-      }).optional().describe('New color'),
+      color: z
+        .object({
+          text: z.string(),
+          background: z.string(),
+        })
+        .optional()
+        .describe('New color'),
     },
     async ({ label, new_name, color }) => {
       const result = await updateLabel(client, labelCache, label, { new_name, color });
@@ -215,7 +219,13 @@ if (isEnabled('gmail_modify_messages')) {
       remove_labels: z.array(z.string()).optional().describe('Label names to remove'),
     },
     async ({ message_ids, add_labels, remove_labels }) => {
-      const result = await modifyMessages(client, labelCache, message_ids, add_labels, remove_labels);
+      const result = await modifyMessages(
+        client,
+        labelCache,
+        message_ids,
+        add_labels,
+        remove_labels,
+      );
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     },
   );
@@ -270,20 +280,24 @@ if (isEnabled('gmail_create_filter')) {
     'gmail_create_filter',
     toolRegistry.gmail_create_filter.description,
     {
-      criteria: z.object({
-        from: z.string().optional(),
-        to: z.string().optional(),
-        subject: z.string().optional(),
-        query: z.string().optional(),
-        has_attachment: z.boolean().optional(),
-      }).describe('Filter matching criteria'),
-      actions: z.object({
-        add_labels: z.array(z.string()).optional(),
-        remove_labels: z.array(z.string()).optional(),
-        forward_to: z.string().optional(),
-        skip_inbox: z.boolean().optional(),
-        mark_read: z.boolean().optional(),
-      }).describe('Actions to apply on matching messages'),
+      criteria: z
+        .object({
+          from: z.string().optional(),
+          to: z.string().optional(),
+          subject: z.string().optional(),
+          query: z.string().optional(),
+          has_attachment: z.boolean().optional(),
+        })
+        .describe('Filter matching criteria'),
+      actions: z
+        .object({
+          add_labels: z.array(z.string()).optional(),
+          remove_labels: z.array(z.string()).optional(),
+          forward_to: z.string().optional(),
+          skip_inbox: z.boolean().optional(),
+          mark_read: z.boolean().optional(),
+        })
+        .describe('Actions to apply on matching messages'),
     },
     async ({ criteria, actions }) => {
       const result = await createFilter(client, labelCache, criteria, actions);
@@ -322,7 +336,15 @@ if (isEnabled('gmail_send_message')) {
       thread_id: z.string().optional(),
     },
     async (params) => {
-      const result = await sendMessage(client, params);
+      const result = await sendMessage(client, {
+        to: params.to,
+        subject: params.subject,
+        body: params.body,
+        cc: params.cc,
+        bcc: params.bcc,
+        contentType: params.content_type,
+        threadId: params.thread_id,
+      });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     },
   );
@@ -395,15 +417,20 @@ if (isEnabled('gmail_delete_draft')) {
 server.resource(
   'labels',
   'gmail://labels',
-  { description: 'All Gmail labels with IDs, names, types, and counts. Use to resolve label names and understand organizational structure.' },
+  {
+    description:
+      'All Gmail labels with IDs, names, types, and counts. Use to resolve label names and understand organizational structure.',
+  },
   async () => {
     const result = await getLabels(client, labelCache);
     return {
-      contents: [{
-        uri: 'gmail://labels',
-        mimeType: 'application/json',
-        text: JSON.stringify(result, null, 2),
-      }],
+      contents: [
+        {
+          uri: 'gmail://labels',
+          mimeType: 'application/json',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
     };
   },
 );
@@ -415,16 +442,22 @@ server.resource(
   async () => {
     const profile = await client.settings.getProfile();
     return {
-      contents: [{
-        uri: 'gmail://profile',
-        mimeType: 'application/json',
-        text: JSON.stringify({
-          email: profile.emailAddress,
-          messages_total: profile.messagesTotal,
-          threads_total: profile.threadsTotal,
-          history_id: profile.historyId,
-        }, null, 2),
-      }],
+      contents: [
+        {
+          uri: 'gmail://profile',
+          mimeType: 'application/json',
+          text: JSON.stringify(
+            {
+              email: profile.emailAddress,
+              messages_total: profile.messagesTotal,
+              threads_total: profile.threadsTotal,
+              history_id: profile.historyId,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
     };
   },
 );
@@ -441,17 +474,20 @@ server.prompt(
     focus: z.string().optional().describe('Focus area: financial, personal, work, or all'),
   },
   ({ days, focus }) => ({
-    messages: [{
-      role: 'user' as const,
-      content: {
-        type: 'text' as const,
-        text: `Please triage my inbox for the last ${days ?? '7'} days${focus && focus !== 'all' ? `, focusing on ${focus} emails` : ''}.\n\n` +
-          `1. Search for unread messages from the last ${days ?? '7'} days\n` +
-          `2. Categorize by urgency: immediate action needed, respond soon, FYI/low priority\n` +
-          `3. For each urgent item, explain why it needs attention\n` +
-          `4. Suggest labels or actions for organization`,
+    messages: [
+      {
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text:
+            `Please triage my inbox for the last ${days ?? '7'} days${focus != null && focus !== 'all' ? `, focusing on ${focus} emails` : ''}.\n\n` +
+            `1. Search for unread messages from the last ${days ?? '7'} days\n` +
+            `2. Categorize by urgency: immediate action needed, respond soon, FYI/low priority\n` +
+            `3. For each urgent item, explain why it needs attention\n` +
+            `4. Suggest labels or actions for organization`,
+        },
       },
-    }],
+    ],
   }),
 );
 
@@ -462,17 +498,20 @@ server.prompt(
     days: z.string().optional().describe('Number of days to look back (default 30)'),
   },
   ({ days }) => ({
-    messages: [{
-      role: 'user' as const,
-      content: {
-        type: 'text' as const,
-        text: `Please summarize my financial emails from the last ${days ?? '30'} days.\n\n` +
-          `1. Search for emails from banks, credit cards, brokerages, and payment services\n` +
-          `2. Extract: amounts, due dates, account references, confirmation numbers\n` +
-          `3. Flag any bills due soon or unusual activity\n` +
-          `4. Organize by category (banking, credit cards, investments, payments)`,
+    messages: [
+      {
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text:
+            `Please summarize my financial emails from the last ${days ?? '30'} days.\n\n` +
+            `1. Search for emails from banks, credit cards, brokerages, and payment services\n` +
+            `2. Extract: amounts, due dates, account references, confirmation numbers\n` +
+            `3. Flag any bills due soon or unusual activity\n` +
+            `4. Organize by category (banking, credit cards, investments, payments)`,
+        },
       },
-    }],
+    ],
   }),
 );
 
@@ -483,17 +522,20 @@ server.prompt(
     days: z.string().optional().describe('Number of days to look back (default 30)'),
   },
   ({ days }) => ({
-    messages: [{
-      role: 'user' as const,
-      content: {
-        type: 'text' as const,
-        text: `Please audit my newsletter and subscription emails from the last ${days ?? '30'} days.\n\n` +
-          `1. Search for newsletters, marketing emails, and subscriptions\n` +
-          `2. List each sender with: frequency, read rate (unread vs total), last opened\n` +
-          `3. Recommend unsubscribes for low-engagement senders\n` +
-          `4. Suggest filters to auto-organize the ones I keep`,
+    messages: [
+      {
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text:
+            `Please audit my newsletter and subscription emails from the last ${days ?? '30'} days.\n\n` +
+            `1. Search for newsletters, marketing emails, and subscriptions\n` +
+            `2. List each sender with: frequency, read rate (unread vs total), last opened\n` +
+            `3. Recommend unsubscribes for low-engagement senders\n` +
+            `4. Suggest filters to auto-organize the ones I keep`,
+        },
       },
-    }],
+    ],
   }),
 );
 
@@ -504,17 +546,20 @@ server.prompt(
     days: z.string().optional().describe('Number of days to look back (default 14)'),
   },
   ({ days }) => ({
-    messages: [{
-      role: 'user' as const,
-      content: {
-        type: 'text' as const,
-        text: `Please find emails from the last ${days ?? '14'} days that likely need my reply.\n\n` +
-          `1. Search for emails from real people (not automated/marketing senders)\n` +
-          `2. Filter to emails that contain questions, requests, or expect a response\n` +
-          `3. Prioritize by: how long ago it was received, sender importance, urgency\n` +
-          `4. For each, draft a suggested reply or suggest what to say`,
+    messages: [
+      {
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text:
+            `Please find emails from the last ${days ?? '14'} days that likely need my reply.\n\n` +
+            `1. Search for emails from real people (not automated/marketing senders)\n` +
+            `2. Filter to emails that contain questions, requests, or expect a response\n` +
+            `3. Prioritize by: how long ago it was received, sender importance, urgency\n` +
+            `4. For each, draft a suggested reply or suggest what to say`,
+        },
       },
-    }],
+    ],
   }),
 );
 
@@ -522,17 +567,20 @@ server.prompt(
   'label_health_check',
   'Audit label system: find empty/overlapping labels, unlabeled important mail, suggest improvements',
   () => ({
-    messages: [{
-      role: 'user' as const,
-      content: {
-        type: 'text' as const,
-        text: `Please audit my Gmail label system.\n\n` +
-          `1. Get all labels with counts\n` +
-          `2. Identify: empty labels, labels with very few messages, redundant/overlapping labels\n` +
-          `3. Check for important mail that's unlabeled (search for unread in inbox without user labels)\n` +
-          `4. Suggest label consolidation, new labels, or filters to improve organization`,
+    messages: [
+      {
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text:
+            `Please audit my Gmail label system.\n\n` +
+            `1. Get all labels with counts\n` +
+            `2. Identify: empty labels, labels with very few messages, redundant/overlapping labels\n` +
+            `3. Check for important mail that's unlabeled (search for unread in inbox without user labels)\n` +
+            `4. Suggest label consolidation, new labels, or filters to improve organization`,
+        },
       },
-    }],
+    ],
   }),
 );
 
@@ -556,14 +604,14 @@ async function startServer() {
   const enabledTools = Object.entries(toolRegistry)
     .filter(([, config]) => config.enabled)
     .map(([name]) => name);
-  console.error(`[gmail-toolkit] Starting MCP server with ${enabledTools.length} tools enabled`);
+  log.info(`Starting MCP server with ${enabledTools.length} tools enabled`);
 
   // Start stdio transport
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
-startServer().catch((err) => {
-  console.error('[gmail-toolkit] Failed to start:', err.message ?? err);
+startServer().catch((err: unknown) => {
+  log.error('Failed to start:', err instanceof Error ? err.message : String(err));
   process.exit(1);
 });

@@ -11,28 +11,28 @@
  */
 
 import { ensureAuthenticated } from '../src/auth.js';
+import { logger } from '../src/logger.js';
+
+const log = logger.child('setup');
 
 const credentialsPath = process.argv[2] ?? './credentials.json';
 const tokenPath = process.argv[3] ?? './token.json';
 
-console.log('Gmail Toolkit — Authentication Setup');
-console.log(`Credentials: ${credentialsPath}`);
-console.log(`Token will be saved to: ${tokenPath}`);
-console.log('');
+log.info('Gmail Toolkit — Authentication Setup');
+log.info(`Credentials: ${credentialsPath}`);
+log.info(`Token will be saved to: ${tokenPath}`);
 
 try {
   await ensureAuthenticated(credentialsPath, tokenPath);
-  console.log('');
-  console.log('Setup complete! Gmail Toolkit is ready to use.');
-  console.log('');
-  console.log('Next steps:');
-  console.log('  Library:  import { GmailToolkit } from "gmail-toolkit"');
-  console.log('  MCP:      Add to claude_desktop_config.json (see README)');
+  log.info('Setup complete! Gmail Toolkit is ready to use.');
+  log.info('Next steps:');
+  log.info('  Library:  import { GmailToolkit } from "gmail-toolkit"');
+  log.info('  MCP:      Add to claude_desktop_config.json (see README)');
 } catch (err) {
   if (err instanceof Error) {
-    console.error(err.message);
+    log.error(err.message);
   } else {
-    console.error('Setup failed:', err);
+    log.error('Setup failed:', err);
   }
   process.exit(1);
 }

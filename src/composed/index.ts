@@ -22,4 +22,13 @@ export {
   sendMessage,
 } from './destructive.js';
 export { processBody, processMessagePayload } from './body-processing.js';
-export { parseContact, parseContactList, deduplicateContacts } from './helpers.js';
+export {
+  parseContact,
+  parseContactList,
+  deduplicateContacts,
+  gmailWebUrl,
+  headerMap,
+  parseDate,
+  hasAttachments,
+  isUserLabel,
+} from './helpers.js';

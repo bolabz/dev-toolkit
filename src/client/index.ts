@@ -6,7 +6,9 @@
  * and rate limiter from the base class.
  */
 
-import { OAuth2Client } from 'google-auth-library';
+import type { OAuth2Client } from 'google-auth-library';
+import PQueue from 'p-queue';
+import { RATE_LIMIT_CONFIG } from './base.js';
 import { MessagesClient } from './messages.js';
 import { ThreadsClient } from './threads.js';
 import { LabelsClient } from './labels.js';
@@ -15,6 +17,9 @@ import { FiltersClient } from './filters.js';
 import { SettingsClient } from './settings.js';
 import { HistoryClient } from './history.js';
 
+/**
+ *
+ */
 export class GmailClient {
   readonly messages: MessagesClient;
   readonly threads: ThreadsClient;
@@ -24,14 +29,21 @@ export class GmailClient {
   readonly settings: SettingsClient;
   readonly history: HistoryClient;
 
+  /**
+   * Create a new GmailClient with authenticated sub-clients sharing a rate limiter.
+   * @param auth - The authenticated OAuth2 client for Gmail API access
+   */
   constructor(auth: OAuth2Client) {
-    this.messages = new MessagesClient(auth);
-    this.threads = new ThreadsClient(auth);
-    this.labels = new LabelsClient(auth);
-    this.drafts = new DraftsClient(auth);
-    this.filters = new FiltersClient(auth);
-    this.settings = new SettingsClient(auth);
-    this.history = new HistoryClient(auth);
+    // Single shared rate limiter across all resource clients to prevent
+    // exceeding Gmail's 250 quota units/second limit
+    const sharedQueue = new PQueue(RATE_LIMIT_CONFIG);
+    this.messages = new MessagesClient(auth, sharedQueue);
+    this.threads = new ThreadsClient(auth, sharedQueue);
+    this.labels = new LabelsClient(auth, sharedQueue);
+    this.drafts = new DraftsClient(auth, sharedQueue);
+    this.filters = new FiltersClient(auth, sharedQueue);
+    this.settings = new SettingsClient(auth, sharedQueue);
+    this.history = new HistoryClient(auth, sharedQueue);
   }
 }
 
