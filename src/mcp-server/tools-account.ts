@@ -5,7 +5,7 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { GmailClient } from '../client/index.js';
+import type { GmailContext } from '../composed/context.js';
 import { getAccount } from '../composed/index.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
 import { toMcpError } from './utils.js';
@@ -14,12 +14,12 @@ import { toMcpError } from './utils.js';
  * Register account-related MCP tools.
  * @param server - The MCP server instance
  * @param toolRegistry - The tool configuration registry
- * @param client - The authenticated Gmail API client
+ * @param context - The authenticated Gmail context
  */
 export function registerAccountTools(
   server: McpServer,
   toolRegistry: Record<ToolName, ToolConfig>,
-  client: GmailClient,
+  context: GmailContext,
 ): void {
   if (toolRegistry.gmail_get_account.enabled) {
     server.registerTool(
@@ -27,7 +27,7 @@ export function registerAccountTools(
       { description: toolRegistry.gmail_get_account.description },
       async () => {
         try {
-          const result = await getAccount(client);
+          const result = await getAccount(context.client);
           return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         } catch (err) {
           return toMcpError(err, 'gmail_get_account');

@@ -7,6 +7,8 @@
  */
 
 export { LabelCache } from './labels.js';
+export { createGmailContext } from './context.js';
+export type { GmailContext } from './context.js';
 export { getLabels, createLabel, updateLabel, deleteLabel } from './labels.js';
 export { search, readMessage, modifyMessages, trashMessages, sendMessage } from './messages.js';
 export { readThread, modifyThread, trashThread } from './threads.js';

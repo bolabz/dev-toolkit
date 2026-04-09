@@ -13,10 +13,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-import { ensureAuthenticated } from './auth.js';
 import { logger } from './logger.js';
-import { GmailClient } from './client/index.js';
-import { LabelCache } from './composed/index.js';
+import { createGmailContext } from './composed/index.js';
 import { resolveToolRegistry } from './mcp-server/tool-registry.js';
 
 import { registerMessageTools } from './mcp-server/tools-messages.js';
@@ -42,25 +40,19 @@ const toolRegistry = resolveToolRegistry();
 // ---------------------------------------------------------------------------
 
 async function startServer() {
-  // Resolve credential paths from env vars or defaults
+  // Initialize authenticated context via Layer 2
   const credentialsPath = process.env.GMAIL_CREDENTIALS_PATH ?? './credentials.json';
   const tokenPath = process.env.GMAIL_TOKEN_PATH ?? './token.json';
-
-  // Seamless auth — handles all states (no token, expired, revoked)
-  const auth = await ensureAuthenticated(credentialsPath, tokenPath);
-
-  // Initialize Layer 1 client and Layer 2 cache
-  const client = new GmailClient(auth);
-  const labelCache = new LabelCache(client);
+  const context = await createGmailContext(credentialsPath, tokenPath);
 
   // Register all MCP capabilities
-  registerMessageTools(server, toolRegistry, client, labelCache);
-  registerThreadTools(server, toolRegistry, client, labelCache);
-  registerLabelTools(server, toolRegistry, client, labelCache);
-  registerDraftTools(server, toolRegistry, client, labelCache);
-  registerFilterTools(server, toolRegistry, client, labelCache);
-  registerAccountTools(server, toolRegistry, client);
-  registerResources(server, client, labelCache);
+  registerMessageTools(server, toolRegistry, context);
+  registerThreadTools(server, toolRegistry, context);
+  registerLabelTools(server, toolRegistry, context);
+  registerDraftTools(server, toolRegistry, context);
+  registerFilterTools(server, toolRegistry, context);
+  registerAccountTools(server, toolRegistry, context);
+  registerResources(server, context);
   registerPrompts(server);
 
   // Log enabled tools
