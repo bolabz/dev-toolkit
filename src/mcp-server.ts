@@ -17,7 +17,7 @@ import { ensureAuthenticated } from './auth.js';
 import { logger } from './logger.js';
 import { GmailClient } from './client/index.js';
 import { LabelCache } from './composed/index.js';
-import { resolveToolRegistry } from './config/tools.js';
+import { resolveToolRegistry } from './mcp-server/tool-registry.js';
 
 import { registerMessageTools } from './mcp-server/tools-messages.js';
 import { registerThreadTools } from './mcp-server/tools-threads.js';

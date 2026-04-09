@@ -15,8 +15,7 @@ import {
   trashMessages,
   sendMessage,
 } from '../composed/index.js';
-import type { ToolName } from '../config/tools.js';
-import type { ToolConfig } from '../config/tools.js';
+import type { ToolName, ToolConfig } from './tool-registry.js';
 import { toMcpError } from './utils.js';
 
 /**

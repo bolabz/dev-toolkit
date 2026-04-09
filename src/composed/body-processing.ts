@@ -60,6 +60,11 @@ const HTML_TO_TEXT_OPTIONS = {
 
 /**
  * Process a raw MIME message body into clean plain text.
+ * Not yet wired up — no RAW format fetch path exists in Layer 1.
+ * Intended for future use when raw MIME message processing is needed
+ * (e.g., imported .eml files or `messages.get(format='RAW')`).
+ * Use {@link processMessagePayload} for Gmail API payloads.
+ * @internal
  * @param rawMessage - Raw RFC 2822 message (base64url or Buffer)
  * @param options - Processing options for reply stripping and HTML inclusion
  * @param options.stripReplies - Whether to strip quoted reply chains (default: true).

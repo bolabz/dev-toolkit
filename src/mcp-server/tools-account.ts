@@ -7,7 +7,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { GmailClient } from '../client/index.js';
 import { getAccount } from '../composed/index.js';
-import type { ToolName, ToolConfig } from '../config/tools.js';
+import type { ToolName, ToolConfig } from './tool-registry.js';
 import { toMcpError } from './utils.js';
 
 /**
