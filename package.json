@@ -9,41 +9,65 @@
     "gmail-toolkit": "dist/mcp-server.js"
   },
   "scripts": {
-    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint:check": "eslint --max-warnings 0 src/",
+    "lint:fix": "eslint --max-warnings 0 --fix src/",
+    "prettier:check": "prettier --check .",
+    "prettier:write": "prettier --write .",
+    "format:check": "npm run prettier:check && npm run lint:check",
+    "format:fix": "npm run prettier:write && npm run lint:fix",
+    "clean": "rm -rf dist coverage docs/typedoc",
+    "test": "npm run typecheck && npm run format:check && npm run docs:check && npm run test:unit",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "dev": "tsx src/mcp-server.ts",
     "start": "node dist/mcp-server.js",
     "setup-auth": "tsx scripts/setup-auth.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint src/ --ext .ts",
-    "clean": "rm -rf dist"
+    "ci": "npm run build && npm run test",
+    "docs": "typedoc",
+    "docs:check": "typedoc --emit none",
+    "prepare": "lefthook install"
   },
-  "keywords": ["gmail", "mcp", "email", "google", "claude"],
+  "keywords": [
+    "gmail",
+    "mcp",
+    "email",
+    "google",
+    "claude"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "googleapis": "^144.0.0",
-    "google-auth-library": "^9.14.0",
-    "open": "^10.1.0",
-    "zod": "^3.23.0",
     "@modelcontextprotocol/sdk": "^1.12.0",
+    "email-reply-parser": "^2.3.5",
+    "google-auth-library": "^9.14.0",
+    "googleapis": "^144.0.0",
+    "he": "^1.2.0",
     "html-to-text": "^9.0.5",
     "mailparser": "^3.7.1",
-    "email-reply-parser": "^2.3.5",
+    "open": "^10.1.0",
     "p-queue": "^8.0.1",
-    "he": "^1.2.0"
+    "zod": "^3.23.0"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "vitest": "^2.0.0",
-    "tsx": "^4.19.0",
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@eslint/js": "^10.0.1",
     "@types/he": "^1.2.3",
-    "@types/mailparser": "^3.4.4",
     "@types/html-to-text": "^9.0.4",
-    "eslint": "^9.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0"
+    "@types/mailparser": "^3.4.4",
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^62.9.0",
+    "lefthook": "^2.1.5",
+    "prettier": "^3.8.1",
+    "tsx": "^4.19.0",
+    "typedoc": "^0.28.18",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.58.1",
+    "vitest": "^2.0.0"
   }
 }
