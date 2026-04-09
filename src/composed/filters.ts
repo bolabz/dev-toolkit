@@ -5,7 +5,10 @@
 import type { gmail_v1 } from 'googleapis';
 import type { GmailClient } from '../client/index.js';
 import type { LabelCache } from './labels.js';
-import type { FilterOverview, FilterDetail } from '../types.js';
+import type { FilterOverview, FilterDetail, DeleteFilterResult } from '../types.js';
+import { logger } from '../logger.js';
+
+const log = logger.child('composed:filters');
 
 // ---------------------------------------------------------------------------
 // Shared Helper
@@ -143,4 +146,56 @@ export async function createFilter(
   const resolvedRemove = await labelCache.resolve(raw.action?.removeLabelIds ?? []);
 
   return toFilterDetail(raw, resolvedAdd, resolvedRemove);
+}
+
+// ---------------------------------------------------------------------------
+// Delete
+// ---------------------------------------------------------------------------
+
+/**
+ * Permanently delete a Gmail filter rule.
+ * @param client - The authenticated Gmail API client
+ * @param filterId - The filter ID to delete
+ * @returns The deletion result with a criteria summary
+ */
+export async function deleteFilter(
+  client: GmailClient,
+  filterId: string,
+): Promise<DeleteFilterResult> {
+  // Fetch filter details BEFORE deleting
+  let criteriaSummary = 'unknown criteria';
+  try {
+    const filter = await client.filters.get(filterId);
+    const c = filter.criteria;
+    const parts = [
+      c?.from != null && `from:${c.from}`,
+      c?.to != null && `to:${c.to}`,
+      c?.subject != null && `subject:${c.subject}`,
+      c?.query != null && `query:${c.query}`,
+      c?.hasAttachment === true && 'has:attachment',
+    ].filter((x): x is string => typeof x === 'string');
+    criteriaSummary = parts.length > 0 ? parts.join(', ') : 'no specific criteria';
+  } catch (err) {
+    log.debug(
+      `Could not fetch filter details for "${filterId}" before delete (proceeding anyway)`,
+      err,
+    );
+  }
+
+  try {
+    await client.filters.delete(filterId);
+    return {
+      deleted: true,
+      filter_id: filterId,
+      criteria_summary: criteriaSummary,
+      message: `Deleted filter (${criteriaSummary}). Future matching messages will no longer be auto-processed by this rule.`,
+    };
+  } catch (err) {
+    return {
+      deleted: false,
+      filter_id: filterId,
+      criteria_summary: criteriaSummary,
+      message: `Failed to delete filter: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 }
