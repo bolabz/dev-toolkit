@@ -1,0 +1,57 @@
+min_version: 1.10.0
+assert_lefthook_installed: true
+
+output:
+  - summary
+  - success
+  - failure
+  - execution_out
+
+pre-commit:
+  piped: true
+  skip:
+    - merge
+    - rebase
+  commands:
+    prettier:
+      priority: 1
+      glob: "**/*.{ts,tsx,js,json,md,yml,yaml}"
+      run: npx prettier --write {staged_files}
+      stage_fixed: true
+      fail_text: "Prettier formatting failed. Run `npm run prettier:write` to fix."
+    eslint:
+      priority: 2
+      glob: "**/*.{ts,tsx}"
+      run: npx eslint --fix {staged_files}
+      stage_fixed: true
+      fail_text: "ESLint check failed. Run `npm run lint:fix` to fix."
+
+pre-push:
+  piped: true
+  commands:
+    typecheck:
+      priority: 1
+      run: npm run typecheck
+      fail_text: "Type check failed. Run `npm run typecheck` to see errors."
+    docs:
+      priority: 2
+      run: npm run docs:check
+      fail_text: "Documentation validation failed. Run `npm run docs:check` to see errors."
+    test:
+      priority: 3
+      run: npm run test:unit
+      fail_text: "Unit tests failed. Run `npm run test:unit` to see failures."
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no -- commitlint --edit {1}
+      fail_text: |
+        Commit message does not follow Conventional Commits.
+        Format:
+          type(scope): subject
+                                    <- blank line required
+          body (required — explain WHY, not just what)
+
+        Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+        Scope is required (e.g., auth, api, mcp). Use kebab-case for multi-word scopes.

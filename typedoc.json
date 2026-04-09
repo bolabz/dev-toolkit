@@ -1,0 +1,44 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["./src"],
+  "entryPointStrategy": "expand",
+  "exclude": ["**/__tests__/**", "**/*.test.ts"],
+  "readme": "none",
+  "out": "docs/typedoc",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "cleanOutputDir": true,
+  "includeVersion": true,
+  "name": "Gmail Toolkit",
+  "tsconfig": "./tsconfig.json",
+  "sort": ["source-order", "required-first"],
+  "sortEntryPoints": true,
+  "categorizeByGroup": true,
+  "navigation": {
+    "includeGroups": true,
+    "includeFolders": true
+  },
+  "highlightLanguages": ["typescript", "bash", "json"],
+  "treatWarningsAsErrors": true,
+  "treatValidationWarningsAsErrors": true,
+  "requiredToBeDocumented": [
+    "Enum",
+    "EnumMember",
+    "Variable",
+    "Function",
+    "Class",
+    "Interface",
+    "Method",
+    "TypeAlias"
+  ],
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "invalidPath": true,
+    "rewrittenLink": true,
+    "notDocumented": true,
+    "unusedMergeModuleWith": true
+  }
+}
