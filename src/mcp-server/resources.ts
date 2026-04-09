@@ -5,21 +5,17 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { GmailClient } from '../client/index.js';
-import type { LabelCache } from '../composed/labels.js';
-import { getLabels } from '../composed/index.js';
+import type { GmailContext } from '../composed/context.js';
+import { getLabels, getAccount } from '../composed/index.js';
 
 /**
  * Register all MCP resources.
  * @param server - The MCP server instance
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
+ * @param context - The authenticated Gmail context
  */
-export function registerResources(
-  server: McpServer,
-  client: GmailClient,
-  labelCache: LabelCache,
-): void {
+export function registerResources(server: McpServer, context: GmailContext): void {
+  const { client, labelCache } = context;
+
   server.registerResource(
     'labels',
     'gmail://labels',
@@ -46,7 +42,7 @@ export function registerResources(
     'gmail://profile',
     { description: 'Account email, total message/thread counts, history ID.' },
     async () => {
-      const profile = await client.settings.getProfile();
+      const account = await getAccount(client);
       return {
         contents: [
           {
@@ -54,10 +50,10 @@ export function registerResources(
             mimeType: 'application/json',
             text: JSON.stringify(
               {
-                email: profile.emailAddress,
-                messages_total: profile.messagesTotal,
-                threads_total: profile.threadsTotal,
-                history_id: profile.historyId,
+                email: account.email,
+                messages_total: account.messages_total,
+                threads_total: account.threads_total,
+                history_id: account.history_id,
               },
               null,
               2,

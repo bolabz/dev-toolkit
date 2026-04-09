@@ -7,10 +7,9 @@
  *   const results = await gmail.search('is:unread from:chase');
  */
 
-import { ensureAuthenticated } from './auth.js';
-import { GmailClient } from './client/index.js';
+import type { GmailContext } from './composed/context.js';
+import { createGmailContext } from './composed/index.js';
 import {
-  LabelCache,
   search,
   readMessage,
   readThread,
@@ -66,13 +65,10 @@ export interface GmailToolkitOptions {
  * and managing Gmail programmatically.
  */
 export class GmailToolkit {
-  /** Layer 1 raw client — direct API access when you need it */
-  readonly client: GmailClient;
-  private readonly labelCache: LabelCache;
+  private readonly context: GmailContext;
 
-  private constructor(client: GmailClient, labelCache: LabelCache) {
-    this.client = client;
-    this.labelCache = labelCache;
+  private constructor(context: GmailContext) {
+    this.context = context;
   }
 
   /**
@@ -87,14 +83,11 @@ export class GmailToolkit {
    * @returns An authenticated GmailToolkit instance ready for use
    */
   static async create(options: GmailToolkitOptions = {}): Promise<GmailToolkit> {
-    const credentialsPath = options.credentialsPath ?? './credentials.json';
-    const tokenPath = options.tokenPath ?? './token.json';
-
-    const auth = await ensureAuthenticated(credentialsPath, tokenPath);
-    const client = new GmailClient(auth);
-    const labelCache = new LabelCache(client);
-
-    return new GmailToolkit(client, labelCache);
+    const context = await createGmailContext(
+      options.credentialsPath ?? './credentials.json',
+      options.tokenPath ?? './token.json',
+    );
+    return new GmailToolkit(context);
   }
 
   // -----------------------------------------------------------------------
@@ -115,7 +108,14 @@ export class GmailToolkit {
     pageToken?: string,
     includeBody?: boolean,
   ): Promise<SearchResult> {
-    return search(this.client, this.labelCache, query, maxResults, pageToken, includeBody);
+    return search(
+      this.context.client,
+      this.context.labelCache,
+      query,
+      maxResults,
+      pageToken,
+      includeBody,
+    );
   }
 
   /**
@@ -125,7 +125,7 @@ export class GmailToolkit {
    * @returns The fully resolved message with parsed contacts and labels
    */
   async readMessage(messageId: string, includeHtml?: boolean): Promise<FullMessage> {
-    return readMessage(this.client, this.labelCache, messageId, includeHtml);
+    return readMessage(this.context.client, this.context.labelCache, messageId, includeHtml);
   }
 
   /**
@@ -134,7 +134,7 @@ export class GmailToolkit {
    * @returns The thread with all messages, participants, and timeline
    */
   async readThread(threadId: string): Promise<FullThread> {
-    return readThread(this.client, this.labelCache, threadId);
+    return readThread(this.context.client, this.context.labelCache, threadId);
   }
 
   /**
@@ -142,7 +142,7 @@ export class GmailToolkit {
    * @returns An overview of system, user, and category labels with counts
    */
   async getLabels(): Promise<LabelOverview> {
-    return getLabels(this.client, this.labelCache);
+    return getLabels(this.context.client, this.context.labelCache);
   }
 
   /**
@@ -157,7 +157,7 @@ export class GmailToolkit {
     query?: string,
     includeBody?: boolean,
   ): Promise<DraftSummary> {
-    return getDrafts(this.client, this.labelCache, maxResults, query, includeBody);
+    return getDrafts(this.context.client, this.context.labelCache, maxResults, query, includeBody);
   }
 
   /**
@@ -165,7 +165,7 @@ export class GmailToolkit {
    * @returns An overview of all configured filters
    */
   async getFilters(): Promise<FilterOverview> {
-    return getFilters(this.client, this.labelCache);
+    return getFilters(this.context.client, this.context.labelCache);
   }
 
   /**
@@ -173,7 +173,7 @@ export class GmailToolkit {
    * @returns An overview of the authenticated Gmail account
    */
   async getAccount(): Promise<AccountOverview> {
-    return getAccount(this.client);
+    return getAccount(this.context.client);
   }
 
   // -----------------------------------------------------------------------
@@ -193,7 +193,7 @@ export class GmailToolkit {
     name: string,
     options?: { color?: { text: string; background: string } },
   ): Promise<LabelDetail> {
-    return createLabel(this.client, this.labelCache, name, options);
+    return createLabel(this.context.client, this.context.labelCache, name, options);
   }
 
   /**
@@ -210,7 +210,7 @@ export class GmailToolkit {
     nameOrId: string,
     updates: { new_name?: string; color?: { text: string; background: string } },
   ): Promise<LabelDetail> {
-    return updateLabel(this.client, this.labelCache, nameOrId, updates);
+    return updateLabel(this.context.client, this.context.labelCache, nameOrId, updates);
   }
 
   /**
@@ -226,8 +226,8 @@ export class GmailToolkit {
     options: { addLabels?: string[]; removeLabels?: string[] },
   ): Promise<ModifyResult> {
     return modifyMessages(
-      this.client,
-      this.labelCache,
+      this.context.client,
+      this.context.labelCache,
       messageIds,
       options.addLabels,
       options.removeLabels,
@@ -247,8 +247,8 @@ export class GmailToolkit {
     options: { addLabels?: string[]; removeLabels?: string[] },
   ): Promise<ModifyResult> {
     return modifyThread(
-      this.client,
-      this.labelCache,
+      this.context.client,
+      this.context.labelCache,
       threadId,
       options.addLabels,
       options.removeLabels,
@@ -276,7 +276,7 @@ export class GmailToolkit {
     contentType?: 'text/plain' | 'text/html';
     threadId?: string;
   }): Promise<DraftDetail> {
-    return createDraft(this.client, options);
+    return createDraft(this.context.client, options);
   }
 
   /**
@@ -311,7 +311,7 @@ export class GmailToolkit {
       mark_read?: boolean;
     },
   ): Promise<FilterDetail> {
-    return createFilter(this.client, this.labelCache, criteria, actions);
+    return createFilter(this.context.client, this.context.labelCache, criteria, actions);
   }
 
   // -----------------------------------------------------------------------
@@ -324,7 +324,7 @@ export class GmailToolkit {
    * @returns A summary of the operation with any failed IDs
    */
   async trashMessages(messageIds: string[]): Promise<ModifyResult> {
-    return trashMessages(this.client, messageIds);
+    return trashMessages(this.context.client, messageIds);
   }
 
   /**
@@ -333,7 +333,7 @@ export class GmailToolkit {
    * @returns A summary of the operation
    */
   async trashThread(threadId: string): Promise<ModifyResult> {
-    return trashThread(this.client, threadId);
+    return trashThread(this.context.client, threadId);
   }
 
   /**
@@ -342,7 +342,7 @@ export class GmailToolkit {
    * @returns The deletion result with affected message/thread counts
    */
   async deleteLabel(nameOrId: string): Promise<DeleteLabelResult> {
-    return deleteLabel(this.client, this.labelCache, nameOrId);
+    return deleteLabel(this.context.client, this.context.labelCache, nameOrId);
   }
 
   /**
@@ -351,7 +351,7 @@ export class GmailToolkit {
    * @returns The deletion result with filter criteria summary
    */
   async deleteFilter(filterId: string): Promise<DeleteFilterResult> {
-    return deleteFilter(this.client, filterId);
+    return deleteFilter(this.context.client, filterId);
   }
 
   /**
@@ -360,7 +360,7 @@ export class GmailToolkit {
    * @returns The deletion result
    */
   async deleteDraft(draftId: string): Promise<DeleteResult> {
-    return deleteDraft(this.client, draftId);
+    return deleteDraft(this.context.client, draftId);
   }
 
   /**
@@ -369,7 +369,7 @@ export class GmailToolkit {
    * @returns The send result with the new message ID
    */
   async sendDraft(draftId: string): Promise<SendResult> {
-    return sendDraft(this.client, draftId);
+    return sendDraft(this.context.client, draftId);
   }
 
   /**
@@ -393,7 +393,7 @@ export class GmailToolkit {
     contentType?: string;
     threadId?: string;
   }): Promise<SendResult> {
-    return sendMessage(this.client, options);
+    return sendMessage(this.context.client, options);
   }
 }
 
@@ -401,8 +401,8 @@ export class GmailToolkit {
 // Re-exports
 // ---------------------------------------------------------------------------
 
-export { GmailClient } from './client/index.js';
-export { LabelCache } from './composed/index.js';
+export { createGmailContext } from './composed/index.js';
+export type { GmailContext } from './composed/context.js';
 export { ensureAuthenticated } from './auth.js';
 export {
   resolveToolRegistry,

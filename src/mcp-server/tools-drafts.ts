@@ -6,8 +6,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { GmailClient } from '../client/index.js';
-import type { LabelCache } from '../composed/labels.js';
+import type { GmailContext } from '../composed/context.js';
 import { getDrafts, createDraft, deleteDraft, sendDraft } from '../composed/index.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
 import { toMcpError } from './utils.js';
@@ -16,15 +15,14 @@ import { toMcpError } from './utils.js';
  * Register all draft-related MCP tools.
  * @param server - The MCP server instance
  * @param toolRegistry - The tool configuration registry
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
+ * @param context - The authenticated Gmail context
  */
 export function registerDraftTools(
   server: McpServer,
   toolRegistry: Record<ToolName, ToolConfig>,
-  client: GmailClient,
-  labelCache: LabelCache,
+  context: GmailContext,
 ): void {
+  const { client, labelCache } = context;
   if (toolRegistry.gmail_get_drafts.enabled) {
     server.registerTool(
       'gmail_get_drafts',
