@@ -7,6 +7,10 @@
 
 import type { GmailClient } from '../client/index.js';
 import type { LabelDetail, LabelOverview } from '../types.js';
+import { GmailValidationError } from '../errors.js';
+import { logger } from '../logger.js';
+
+const log = logger.child('composed:labels');
 
 // ---------------------------------------------------------------------------
 // Label Cache
@@ -58,7 +62,7 @@ export class LabelCache {
     for (const name of labelNames) {
       const id = await this.lookup(name);
       if (id == null) {
-        throw new Error(`Label not found: "${name}"`);
+        throw new GmailValidationError(`Label not found: "${name}"`, 'lookupMany', 'labelName');
       }
       ids.push(id);
     }
@@ -168,6 +172,7 @@ export async function getLabels(
 
   // Refresh cache since we just fetched all labels
   labelCache.invalidate();
+  log.debug('Label cache refreshed after getLabels()');
 
   return {
     system_labels: systemLabels.map((l) => toDetail(l)),

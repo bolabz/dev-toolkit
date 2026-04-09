@@ -32,15 +32,17 @@ export class MessagesClient extends GmailClientBase {
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }> {
-    const response = await this.execute(() =>
-      this.gmail.users.messages.list({
-        userId: this.userId,
-        q: options.query,
-        maxResults: options.maxResults ?? 20,
-        pageToken: options.pageToken,
-        labelIds: options.labelIds,
-        includeSpamTrash: options.includeSpamTrash ?? false,
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.messages.list({
+          userId: this.userId,
+          q: options.query,
+          maxResults: options.maxResults ?? 20,
+          pageToken: options.pageToken,
+          labelIds: options.labelIds,
+          includeSpamTrash: options.includeSpamTrash ?? false,
+        }),
+      'messages.list',
     );
 
     return {
@@ -65,13 +67,15 @@ export class MessagesClient extends GmailClientBase {
     format: MessageFormat = 'full',
     metadataHeaders?: string[],
   ): Promise<gmail_v1.Schema$Message> {
-    const response = await this.execute(() =>
-      this.gmail.users.messages.get({
-        userId: this.userId,
-        id,
-        format,
-        metadataHeaders,
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.messages.get({
+          userId: this.userId,
+          id,
+          format,
+          metadataHeaders,
+        }),
+      'messages.get',
     );
     return response.data;
   }
@@ -99,7 +103,7 @@ export class MessagesClient extends GmailClientBase {
           })
           .then((r) => r.data),
     );
-    return this.batchExecute(fns);
+    return this.batchExecute(fns, 'messages.batchGet');
   }
 
   /**
@@ -114,12 +118,14 @@ export class MessagesClient extends GmailClientBase {
     addLabelIds: string[] = [],
     removeLabelIds: string[] = [],
   ): Promise<gmail_v1.Schema$Message> {
-    const response = await this.execute(() =>
-      this.gmail.users.messages.modify({
-        userId: this.userId,
-        id,
-        requestBody: { addLabelIds, removeLabelIds },
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.messages.modify({
+          userId: this.userId,
+          id,
+          requestBody: { addLabelIds, removeLabelIds },
+        }),
+      'messages.modify',
     );
     return response.data;
   }
@@ -135,11 +141,13 @@ export class MessagesClient extends GmailClientBase {
     addLabelIds: string[] = [],
     removeLabelIds: string[] = [],
   ): Promise<void> {
-    await this.execute(() =>
-      this.gmail.users.messages.batchModify({
-        userId: this.userId,
-        requestBody: { ids, addLabelIds, removeLabelIds },
-      }),
+    await this.execute(
+      () =>
+        this.gmail.users.messages.batchModify({
+          userId: this.userId,
+          requestBody: { ids, addLabelIds, removeLabelIds },
+        }),
+      'messages.batchModify',
     );
   }
 
@@ -150,11 +158,13 @@ export class MessagesClient extends GmailClientBase {
    * @returns The sent message object with ID and thread info
    */
   async send(raw: string, threadId?: string): Promise<gmail_v1.Schema$Message> {
-    const response = await this.execute(() =>
-      this.gmail.users.messages.send({
-        userId: this.userId,
-        requestBody: { raw, threadId },
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.messages.send({
+          userId: this.userId,
+          requestBody: { raw, threadId },
+        }),
+      'messages.send',
     );
     return response.data;
   }
@@ -165,8 +175,9 @@ export class MessagesClient extends GmailClientBase {
    * @returns The updated message object
    */
   async trash(id: string): Promise<gmail_v1.Schema$Message> {
-    const response = await this.execute(() =>
-      this.gmail.users.messages.trash({ userId: this.userId, id }),
+    const response = await this.execute(
+      () => this.gmail.users.messages.trash({ userId: this.userId, id }),
+      'messages.trash',
     );
     return response.data;
   }
@@ -177,8 +188,9 @@ export class MessagesClient extends GmailClientBase {
    * @returns The restored message object
    */
   async untrash(id: string): Promise<gmail_v1.Schema$Message> {
-    const response = await this.execute(() =>
-      this.gmail.users.messages.untrash({ userId: this.userId, id }),
+    const response = await this.execute(
+      () => this.gmail.users.messages.untrash({ userId: this.userId, id }),
+      'messages.untrash',
     );
     return response.data;
   }
@@ -188,7 +200,10 @@ export class MessagesClient extends GmailClientBase {
    * @param id - The Gmail message ID to permanently delete
    */
   async delete(id: string): Promise<void> {
-    await this.execute(() => this.gmail.users.messages.delete({ userId: this.userId, id }));
+    await this.execute(
+      () => this.gmail.users.messages.delete({ userId: this.userId, id }),
+      'messages.delete',
+    );
   }
 
   /**
@@ -201,12 +216,14 @@ export class MessagesClient extends GmailClientBase {
     messageId: string,
     attachmentId: string,
   ): Promise<{ data: string; size: number }> {
-    const response = await this.execute(() =>
-      this.gmail.users.messages.attachments.get({
-        userId: this.userId,
-        messageId,
-        id: attachmentId,
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.messages.attachments.get({
+          userId: this.userId,
+          messageId,
+          id: attachmentId,
+        }),
+      'messages.getAttachment',
     );
     return {
       data: response.data.data ?? '',

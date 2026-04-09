@@ -9,6 +9,7 @@ import type { gmail_v1 } from 'googleapis';
 import { google } from 'googleapis';
 import type { OAuth2Client } from 'google-auth-library';
 import PQueue from 'p-queue';
+import { GmailApiError, GmailValidationError } from '../errors.js';
 
 // ---------------------------------------------------------------------------
 // Rate Limiter Configuration
@@ -45,11 +46,20 @@ export class GmailClientBase {
 
   /**
    * Execute an API call through the rate limiter.
+   * All unrecognised errors are wrapped in `GmailApiError` so callers always
+   * receive a typed, stable error interface. Already-typed errors pass through.
    * @param fn - The async function that performs the API call
+   * @param operation - A label used in error messages, e.g. `'messages.list'`
    * @returns The resolved result of the API call
    */
-  protected async execute<T>(fn: () => Promise<T>): Promise<T> {
-    return (await this.queue.add(fn, { throwOnTimeout: true })) as Promise<T>;
+  protected async execute<T>(fn: () => Promise<T>, operation = 'unknown'): Promise<T> {
+    try {
+      return (await this.queue.add(fn, { throwOnTimeout: true })) as T;
+    } catch (err) {
+      // Pass through errors that already carry full context.
+      if (err instanceof GmailApiError || err instanceof GmailValidationError) throw err;
+      throw new GmailApiError(operation, err);
+    }
   }
 
   /**
@@ -61,10 +71,14 @@ export class GmailClientBase {
    * ensures we stay within quota. For true HTTP batching, we'd need
    * to construct multipart requests manually — a future optimization.
    * @param fns - An array of async functions to execute concurrently
+   * @param operation - A label used in error messages for all items in the batch
    * @returns The resolved results of all API calls
    */
-  protected async batchExecute<T>(fns: Array<() => Promise<T>>): Promise<T[]> {
-    return Promise.all(fns.map((fn) => this.execute(fn)));
+  protected async batchExecute<T>(
+    fns: Array<() => Promise<T>>,
+    operation = 'unknown',
+  ): Promise<T[]> {
+    return Promise.all(fns.map((fn) => this.execute(fn, operation)));
   }
 
   /**
@@ -72,19 +86,21 @@ export class GmailClientBase {
    * @param listFn - A function that fetches a page of results given an optional page token
    * @param extractItems - A function that extracts items from a page response
    * @param maxPages - The maximum number of pages to fetch before stopping
+   * @param operation - A label used in error messages
    * @returns All items collected across all pages
    */
   protected async paginate<TItem, TResponse extends { data: { nextPageToken?: string | null } }>(
     listFn: (pageToken?: string) => Promise<TResponse>,
     extractItems: (response: TResponse) => TItem[] | undefined,
     maxPages = 50,
+    operation = 'unknown',
   ): Promise<TItem[]> {
     const allItems: TItem[] = [];
     let pageToken: string | undefined;
     let pages = 0;
 
     do {
-      const response = await this.execute(() => listFn(pageToken));
+      const response = await this.execute(() => listFn(pageToken), operation);
       const items = extractItems(response);
       if (items !== undefined) {
         allItems.push(...items);

@@ -5,7 +5,7 @@
  * with mocked HTTP responses.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
 
 describe('MessagesClient', () => {
   it.todo('list() returns parsed message IDs and pagination token');

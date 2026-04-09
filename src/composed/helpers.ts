@@ -7,6 +7,9 @@
 
 import type { gmail_v1 } from 'googleapis';
 import type { Contact } from '../types.js';
+import { logger } from '../logger.js';
+
+const log = logger.child('composed:helpers');
 
 /**
  * Parse a single email contact string into a Contact object.
@@ -124,7 +127,8 @@ export function headerMap(headers: gmail_v1.Schema$MessagePartHeader[]): Map<str
 export function parseDate(dateStr: string): string {
   try {
     return new Date(dateStr).toISOString();
-  } catch {
+  } catch (err) {
+    log.debug(`Failed to parse date "${dateStr}", returning raw string`, err);
     return dateStr;
   }
 }

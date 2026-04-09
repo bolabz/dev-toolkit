@@ -4,7 +4,7 @@
  * Tests each pipeline stage with real-world email samples.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
 
 describe('Body Processing Pipeline', () => {
   describe('HTML → Text', () => {

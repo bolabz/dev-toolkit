@@ -14,6 +14,9 @@ import type {
   DeleteLabelResult,
   DeleteFilterResult,
 } from '../types.js';
+import { logger } from '../logger.js';
+
+const log = logger.child('composed:destructive');
 
 /**
  * Move messages to the trash (recoverable for 30 days).
@@ -29,7 +32,8 @@ export async function trashMessages(
   for (const id of messageIds) {
     try {
       await client.messages.trash(id);
-    } catch {
+    } catch (err) {
+      log.debug(`Failed to trash message ${id}`, err);
       failed.push(id);
     }
   }
@@ -53,7 +57,8 @@ export async function trashThread(client: GmailClient, threadId: string): Promis
   try {
     await client.threads.trash(threadId);
     return { modified: 1, failed: [], message: 'Thread moved to Trash. Recoverable for 30 days.' };
-  } catch {
+  } catch (err) {
+    log.debug(`Failed to trash thread ${threadId}`, err);
     return { modified: 0, failed: [threadId], message: `Failed to trash thread ${threadId}.` };
   }
 }
@@ -85,8 +90,8 @@ export async function deleteLabel(
     labelName = detail.name ?? nameOrId;
     messagesAffected = detail.messagesTotal ?? 0;
     threadsAffected = detail.threadsTotal ?? 0;
-  } catch {
-    // If we can't get details, still proceed with delete
+  } catch (err) {
+    log.debug(`Could not fetch label details for "${id}" before delete (proceeding anyway)`, err);
   }
 
   try {
@@ -146,8 +151,11 @@ export async function deleteFilter(
       parts.push('has:attachment');
     }
     criteriaSummary = parts.length > 0 ? parts.join(', ') : 'no specific criteria';
-  } catch {
-    // If we can't get details, still proceed with delete
+  } catch (err) {
+    log.debug(
+      `Could not fetch filter details for "${filterId}" before delete (proceeding anyway)`,
+      err,
+    );
   }
 
   try {

@@ -29,15 +29,17 @@ export class ThreadsClient extends GmailClientBase {
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }> {
-    const response = await this.execute(() =>
-      this.gmail.users.threads.list({
-        userId: this.userId,
-        q: options.query,
-        maxResults: options.maxResults ?? 20,
-        pageToken: options.pageToken,
-        labelIds: options.labelIds,
-        includeSpamTrash: options.includeSpamTrash ?? false,
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.threads.list({
+          userId: this.userId,
+          q: options.query,
+          maxResults: options.maxResults ?? 20,
+          pageToken: options.pageToken,
+          labelIds: options.labelIds,
+          includeSpamTrash: options.includeSpamTrash ?? false,
+        }),
+      'threads.list',
     );
 
     return {
@@ -58,12 +60,9 @@ export class ThreadsClient extends GmailClientBase {
    * @returns The raw Gmail API thread object with all messages
    */
   async get(id: string, format: MessageFormat = 'full'): Promise<gmail_v1.Schema$Thread> {
-    const response = await this.execute(() =>
-      this.gmail.users.threads.get({
-        userId: this.userId,
-        id,
-        format,
-      }),
+    const response = await this.execute(
+      () => this.gmail.users.threads.get({ userId: this.userId, id, format }),
+      'threads.get',
     );
     return response.data;
   }
@@ -80,12 +79,14 @@ export class ThreadsClient extends GmailClientBase {
     addLabelIds: string[] = [],
     removeLabelIds: string[] = [],
   ): Promise<gmail_v1.Schema$Thread> {
-    const response = await this.execute(() =>
-      this.gmail.users.threads.modify({
-        userId: this.userId,
-        id,
-        requestBody: { addLabelIds, removeLabelIds },
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.threads.modify({
+          userId: this.userId,
+          id,
+          requestBody: { addLabelIds, removeLabelIds },
+        }),
+      'threads.modify',
     );
     return response.data;
   }
@@ -96,8 +97,9 @@ export class ThreadsClient extends GmailClientBase {
    * @returns The updated thread object
    */
   async trash(id: string): Promise<gmail_v1.Schema$Thread> {
-    const response = await this.execute(() =>
-      this.gmail.users.threads.trash({ userId: this.userId, id }),
+    const response = await this.execute(
+      () => this.gmail.users.threads.trash({ userId: this.userId, id }),
+      'threads.trash',
     );
     return response.data;
   }
@@ -108,8 +110,9 @@ export class ThreadsClient extends GmailClientBase {
    * @returns The restored thread object
    */
   async untrash(id: string): Promise<gmail_v1.Schema$Thread> {
-    const response = await this.execute(() =>
-      this.gmail.users.threads.untrash({ userId: this.userId, id }),
+    const response = await this.execute(
+      () => this.gmail.users.threads.untrash({ userId: this.userId, id }),
+      'threads.untrash',
     );
     return response.data;
   }
@@ -119,6 +122,9 @@ export class ThreadsClient extends GmailClientBase {
    * @param id - The Gmail thread ID to permanently delete
    */
   async delete(id: string): Promise<void> {
-    await this.execute(() => this.gmail.users.threads.delete({ userId: this.userId, id }));
+    await this.execute(
+      () => this.gmail.users.threads.delete({ userId: this.userId, id }),
+      'threads.delete',
+    );
   }
 }

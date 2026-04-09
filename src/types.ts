@@ -435,17 +435,21 @@ const SendResultSchema = z.object({
 export type SendResult = z.infer<typeof SendResultSchema>;
 
 // ---------------------------------------------------------------------------
-// Error
+// Error (MCP response DTO)
 // ---------------------------------------------------------------------------
 
 export /**
- *
+ * Serialised error shape returned by MCP tool handlers when an operation fails.
+ * Tool handlers catch `GmailApiError` / `GmailValidationError` from Layers 1–2
+ * and populate this schema before returning `{ content, isError: true }`.
+ * Not thrown directly — see `src/errors.ts` for the thrown error classes.
  */
 const GmailToolkitErrorSchema = z.object({
   code: z.number(),
   message: z.string(),
   operation: z.string(),
   retryable: z.boolean(),
+  field: z.string().optional(),
 });
 /**
  *

@@ -15,7 +15,10 @@ export class SettingsClient extends GmailClientBase {
    * @returns The user's Gmail profile data
    */
   async getProfile(): Promise<gmail_v1.Schema$Profile> {
-    const response = await this.execute(() => this.gmail.users.getProfile({ userId: this.userId }));
+    const response = await this.execute(
+      () => this.gmail.users.getProfile({ userId: this.userId }),
+      'settings.getProfile',
+    );
     return response.data;
   }
 
@@ -24,8 +27,9 @@ export class SettingsClient extends GmailClientBase {
    * @returns The vacation responder configuration
    */
   async getVacation(): Promise<gmail_v1.Schema$VacationSettings> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.getVacation({ userId: this.userId }),
+    const response = await this.execute(
+      () => this.gmail.users.settings.getVacation({ userId: this.userId }),
+      'settings.getVacation',
     );
     return response.data;
   }
@@ -38,11 +42,10 @@ export class SettingsClient extends GmailClientBase {
   async updateVacation(
     settings: gmail_v1.Schema$VacationSettings,
   ): Promise<gmail_v1.Schema$VacationSettings> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.updateVacation({
-        userId: this.userId,
-        requestBody: settings,
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.settings.updateVacation({ userId: this.userId, requestBody: settings }),
+      'settings.updateVacation',
     );
     return response.data;
   }
@@ -52,8 +55,9 @@ export class SettingsClient extends GmailClientBase {
    * @returns The auto-forwarding settings including email and disposition
    */
   async getAutoForwarding(): Promise<gmail_v1.Schema$AutoForwarding> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.getAutoForwarding({ userId: this.userId }),
+    const response = await this.execute(
+      () => this.gmail.users.settings.getAutoForwarding({ userId: this.userId }),
+      'settings.getAutoForwarding',
     );
     return response.data;
   }
@@ -63,8 +67,9 @@ export class SettingsClient extends GmailClientBase {
    * @returns The IMAP configuration for the account
    */
   async getImap(): Promise<gmail_v1.Schema$ImapSettings> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.getImap({ userId: this.userId }),
+    const response = await this.execute(
+      () => this.gmail.users.settings.getImap({ userId: this.userId }),
+      'settings.getImap',
     );
     return response.data;
   }
@@ -74,8 +79,9 @@ export class SettingsClient extends GmailClientBase {
    * @returns The POP configuration for the account
    */
   async getPop(): Promise<gmail_v1.Schema$PopSettings> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.getPop({ userId: this.userId }),
+    const response = await this.execute(
+      () => this.gmail.users.settings.getPop({ userId: this.userId }),
+      'settings.getPop',
     );
     return response.data;
   }
@@ -85,8 +91,9 @@ export class SettingsClient extends GmailClientBase {
    * @returns The configured send-as email aliases
    */
   async listSendAs(): Promise<gmail_v1.Schema$SendAs[]> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.sendAs.list({ userId: this.userId }),
+    const response = await this.execute(
+      () => this.gmail.users.settings.sendAs.list({ userId: this.userId }),
+      'settings.listSendAs',
     );
     return response.data.sendAs ?? [];
   }
@@ -96,8 +103,9 @@ export class SettingsClient extends GmailClientBase {
    * @returns The configured delegate accounts
    */
   async listDelegates(): Promise<gmail_v1.Schema$Delegate[]> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.delegates.list({ userId: this.userId }),
+    const response = await this.execute(
+      () => this.gmail.users.settings.delegates.list({ userId: this.userId }),
+      'settings.listDelegates',
     );
     return response.data.delegates ?? [];
   }
@@ -107,8 +115,9 @@ export class SettingsClient extends GmailClientBase {
    * @returns The registered forwarding email addresses
    */
   async listForwardingAddresses(): Promise<gmail_v1.Schema$ForwardingAddress[]> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.forwardingAddresses.list({ userId: this.userId }),
+    const response = await this.execute(
+      () => this.gmail.users.settings.forwardingAddresses.list({ userId: this.userId }),
+      'settings.listForwardingAddresses',
     );
     return response.data.forwardingAddresses ?? [];
   }

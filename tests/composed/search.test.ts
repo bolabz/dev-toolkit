@@ -5,7 +5,7 @@
  * with mocked Layer 1 client.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
 
 describe('search()', () => {
   it.todo('aggregates list → batchGet → label resolve into SearchResult');

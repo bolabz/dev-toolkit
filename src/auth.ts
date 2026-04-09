@@ -291,8 +291,8 @@ class MissingCredentialsError extends Error {
 async function openCredentialsConsole(): Promise<void> {
   try {
     await open('https://console.cloud.google.com/apis/credentials/oauthclient');
-  } catch {
-    // Non-fatal — the error message includes all the links anyway
+  } catch (err) {
+    log.debug('Failed to open credentials console in browser (non-fatal)', err);
   }
 }
 
