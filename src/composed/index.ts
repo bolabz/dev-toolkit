@@ -31,4 +31,6 @@ export {
   parseDate,
   hasAttachments,
   isUserLabel,
+  buildRfc2822Message,
+  formatLabelChanges,
 } from './helpers.js';

@@ -298,10 +298,7 @@ async function openCredentialsConsole(): Promise<void> {
 
 function isInvalidGrant(err: unknown): boolean {
   if (err instanceof Error) {
-    return (
-      err.message.includes('invalid_grant') ||
-      err.message.includes('Token has been expired or revoked')
-    );
+    return /invalid_grant|Token has been expired or revoked/.test(err.message);
   }
   return false;
 }

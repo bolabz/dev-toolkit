@@ -169,17 +169,17 @@ export function resolveToolRegistry(): Record<ToolName, ToolConfig> {
   const enableList = parseToolList(process.env.GMAIL_ENABLE_TOOLS);
   const disableList = parseToolList(process.env.GMAIL_DISABLE_TOOLS);
 
-  for (const name of enableList) {
+  enableList.forEach((name) => {
     if (name in registry) {
       (registry[name as ToolName] as { enabled: boolean }).enabled = true;
     }
-  }
+  });
 
-  for (const name of disableList) {
+  disableList.forEach((name) => {
     if (name in registry) {
       (registry[name as ToolName] as { enabled: boolean }).enabled = false;
     }
-  }
+  });
 
   return registry;
 }
@@ -201,17 +201,15 @@ export function getEnabledTools(): Array<[ToolName, ToolConfig]> {
  */
 export function getToolsByCategory(): Record<ToolCategory, ToolName[]> {
   const registry = resolveToolRegistry();
-  const result: Record<ToolCategory, ToolName[]> = {
-    read: [],
-    write: [],
-    destructive: [],
-  };
-
-  for (const [name, config] of Object.entries(registry) as Array<[ToolName, ToolConfig]>) {
-    result[config.category].push(name);
-  }
-
-  return result;
+  return (Object.entries(registry) as Array<[ToolName, ToolConfig]>).reduce<
+    Record<ToolCategory, ToolName[]>
+  >(
+    (acc, [name, config]) => {
+      acc[config.category].push(name);
+      return acc;
+    },
+    { read: [], write: [], destructive: [] },
+  );
 }
 
 // ---------------------------------------------------------------------------

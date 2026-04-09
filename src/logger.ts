@@ -153,11 +153,7 @@ export class Logger {
     const label = LEVEL_LABELS[level];
     const prefix = `${timestamp} [${this.prefix}] ${label}`;
 
-    if (args.length > 0) {
-      console.error(prefix, message, ...args);
-    } else {
-      console.error(prefix, message);
-    }
+    console.error(prefix, message, ...args);
   }
 }
 
