@@ -3,6 +3,13 @@ node_modules/
 
 # Build output
 dist/
+scripts/**/*.js
+scripts/**/*.js.map
+scripts/**/*.d.ts
+scripts/**/*.d.ts.map
+
+# Debug output
+scripts/debug-raw-output.json
 
 # Auth credentials (NEVER commit these)
 credentials.json

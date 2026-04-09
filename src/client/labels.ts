@@ -21,8 +21,9 @@ export class LabelsClient extends GmailClientBase {
    * @returns All Gmail labels without detailed counts
    */
   async list(): Promise<gmail_v1.Schema$Label[]> {
-    const response = await this.execute(() =>
-      this.gmail.users.labels.list({ userId: this.userId }),
+    const response = await this.execute(
+      () => this.gmail.users.labels.list({ userId: this.userId }),
+      'labels.list',
     );
     return response.data.labels ?? [];
   }
@@ -33,8 +34,9 @@ export class LabelsClient extends GmailClientBase {
    * @returns The label with detailed message and thread counts
    */
   async get(id: string): Promise<gmail_v1.Schema$Label> {
-    const response = await this.execute(() =>
-      this.gmail.users.labels.get({ userId: this.userId, id }),
+    const response = await this.execute(
+      () => this.gmail.users.labels.get({ userId: this.userId, id }),
+      'labels.get',
     );
     return response.data;
   }
@@ -48,7 +50,7 @@ export class LabelsClient extends GmailClientBase {
     const fns = ids.map(
       (id) => () => this.gmail.users.labels.get({ userId: this.userId, id }).then((r) => r.data),
     );
-    return this.batchExecute(fns);
+    return this.batchExecute(fns, 'labels.batchGet');
   }
 
   /**
@@ -58,16 +60,18 @@ export class LabelsClient extends GmailClientBase {
    * @returns The created label object
    */
   async create(name: string, options: CreateLabelOptions = {}): Promise<gmail_v1.Schema$Label> {
-    const response = await this.execute(() =>
-      this.gmail.users.labels.create({
-        userId: this.userId,
-        requestBody: {
-          name,
-          messageListVisibility: options.messageListVisibility,
-          labelListVisibility: options.labelListVisibility,
-          color: options.color,
-        },
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.labels.create({
+          userId: this.userId,
+          requestBody: {
+            name,
+            messageListVisibility: options.messageListVisibility,
+            labelListVisibility: options.labelListVisibility,
+            color: options.color,
+          },
+        }),
+      'labels.create',
     );
     return response.data;
   }
@@ -87,12 +91,14 @@ export class LabelsClient extends GmailClientBase {
       color: { textColor: string; backgroundColor: string };
     }>,
   ): Promise<gmail_v1.Schema$Label> {
-    const response = await this.execute(() =>
-      this.gmail.users.labels.patch({
-        userId: this.userId,
-        id,
-        requestBody: updates,
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.labels.patch({
+          userId: this.userId,
+          id,
+          requestBody: updates,
+        }),
+      'labels.update',
     );
     return response.data;
   }
@@ -102,6 +108,9 @@ export class LabelsClient extends GmailClientBase {
    * @param id - The Gmail label ID to delete
    */
   async delete(id: string): Promise<void> {
-    await this.execute(() => this.gmail.users.labels.delete({ userId: this.userId, id }));
+    await this.execute(
+      () => this.gmail.users.labels.delete({ userId: this.userId, id }),
+      'labels.delete',
+    );
   }
 }

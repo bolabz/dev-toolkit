@@ -6,6 +6,9 @@
 
 import type { GmailClient } from '../client/index.js';
 import type { AccountOverview } from '../types.js';
+import { logger } from '../logger.js';
+
+const log = logger.child('composed:account');
 
 /**
  * Get account information including profile, vacation, and forwarding settings.
@@ -20,7 +23,10 @@ export async function getAccount(client: GmailClient): Promise<AccountOverview> 
       client.settings.getVacation(),
       client.settings.getAutoForwarding(),
       client.settings.listSendAs(),
-      client.settings.listDelegates().catch(() => []), // May fail without delegate scope
+      client.settings.listDelegates().catch((err: unknown) => {
+        log.debug('listDelegates failed (likely missing delegate OAuth scope)', err);
+        return [];
+      }), // May fail without delegate scope
       client.settings.listForwardingAddresses(),
       client.settings.getImap(),
       client.settings.getPop(),

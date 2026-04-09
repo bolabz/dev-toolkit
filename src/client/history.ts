@@ -28,15 +28,17 @@ export class HistoryClient extends GmailClientBase {
     nextPageToken: string | null;
     historyId: string;
   }> {
-    const response = await this.execute(() =>
-      this.gmail.users.history.list({
-        userId: this.userId,
-        startHistoryId: options.startHistoryId,
-        historyTypes: options.historyTypes,
-        labelId: options.labelId,
-        maxResults: options.maxResults,
-        pageToken: options.pageToken,
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.history.list({
+          userId: this.userId,
+          startHistoryId: options.startHistoryId,
+          historyTypes: options.historyTypes,
+          labelId: options.labelId,
+          maxResults: options.maxResults,
+          pageToken: options.pageToken,
+        }),
+      'history.list',
     );
 
     return {

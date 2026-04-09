@@ -17,6 +17,9 @@
 import { convert as htmlToText } from 'html-to-text';
 import { simpleParser, type ParsedMail } from 'mailparser';
 import he from 'he';
+import { logger } from '../logger.js';
+
+const log = logger.child('composed:body-processing');
 
 // email-reply-parser v2 ships as CJS with a default export constructor.
 // We type the constructor explicitly to avoid `any` throughout.
@@ -229,7 +232,8 @@ async function stripReplyChain(text: string): Promise<string> {
     const parser = await getReplyParser();
     const result = parser.parseReply(text);
     return result || text; // fall back to full text if parser returns empty
-  } catch {
+  } catch (err) {
+    log.debug('email-reply-parser failed, returning unstripped text', err);
     return text; // non-fatal — return unmodified
   }
 }
@@ -311,7 +315,8 @@ function shortenTrackingUrls(text: string): string {
       try {
         const domain = new URL(url).hostname.replace(/^www\./, '');
         return `[link: ${domain}]`;
-      } catch {
+      } catch (err) {
+        log.debug(`Failed to parse tracking URL, using fallback: ${url}`, err);
         return '[link]';
       }
     }
@@ -326,7 +331,8 @@ function shortenTrackingUrls(text: string): string {
       try {
         const domain = new URL(url).hostname.replace(/^www\./, '');
         return `[link: ${domain}]`;
-      } catch {
+      } catch (err) {
+        log.debug(`Failed to parse tracking URL, using fallback: ${url}`, err);
         return '[link]';
       }
     }

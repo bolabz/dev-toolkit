@@ -4,7 +4,7 @@
  * Tests tool registry configuration, schema generation, and serialization.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
 
 describe('MCP Server', () => {
   describe('Tool Registry', () => {

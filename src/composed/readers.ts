@@ -16,6 +16,9 @@ import {
   isUserLabel,
 } from './helpers.js';
 import type { FullMessage, FullThread, Contact, AttachmentInfo } from '../types.js';
+import { logger } from '../logger.js';
+
+const log = logger.child('composed:readers');
 
 // ---------------------------------------------------------------------------
 // Read Single Message
@@ -98,7 +101,11 @@ export async function readThread(
           messages_total: l.messagesTotal ?? 0,
           messages_unread: l.messagesUnread ?? 0,
         }));
-      } catch {
+      } catch (err) {
+        log.debug(
+          'Non-fatal: failed to fetch label context for thread, returning empty array',
+          err,
+        );
         // Non-fatal — return empty array rather than omitting
         labelContext = [];
       }

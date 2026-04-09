@@ -407,4 +407,5 @@ export { ensureAuthenticated } from './auth.js';
 export { resolveToolRegistry, getEnabledTools, getToolsByCategory } from './config/tools.js';
 export { Logger, logger } from './logger.js';
 export type { LogLevel } from './logger.js';
+export { GmailApiError, GmailValidationError } from './errors.js';
 export * from './types.js';

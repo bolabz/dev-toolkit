@@ -7,6 +7,9 @@
 import type { GmailClient } from '../client/index.js';
 import type { LabelCache } from './labels.js';
 import type { ModifyResult } from '../types.js';
+import { logger } from '../logger.js';
+
+const log = logger.child('composed:writers');
 
 /**
  * Modify labels on one or more messages.
@@ -36,12 +39,17 @@ export async function modifyMessages(
     const chunk = messageIds.slice(i, i + 1000);
     try {
       await client.messages.batchModify(chunk, addLabelIds, removeLabelIds);
-    } catch {
+    } catch (err) {
+      log.debug(
+        `batchModify failed for chunk of ${chunk.length} messages, retrying individually`,
+        err,
+      );
       // If batch fails, try individually to identify which messages failed
       for (const id of chunk) {
         try {
           await client.messages.modify(id, addLabelIds, removeLabelIds);
-        } catch {
+        } catch (singleErr) {
+          log.debug(`Individual modify failed for message ${id}`, singleErr);
           failed.push(id);
         }
       }
@@ -84,7 +92,8 @@ export async function modifyThread(
       failed: [],
       message: `Modified thread.${addLabels.length > 0 ? ` Added: ${addLabels.join(', ')}.` : ''}${removeLabels.length > 0 ? ` Removed: ${removeLabels.join(', ')}.` : ''}`,
     };
-  } catch {
+  } catch (err) {
+    log.debug(`Failed to modify thread ${threadId}`, err);
     return { modified: 0, failed: [threadId], message: `Failed to modify thread ${threadId}.` };
   }
 }

@@ -15,8 +15,9 @@ export class FiltersClient extends GmailClientBase {
    * @returns All Gmail filter rules
    */
   async list(): Promise<gmail_v1.Schema$Filter[]> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.filters.list({ userId: this.userId }),
+    const response = await this.execute(
+      () => this.gmail.users.settings.filters.list({ userId: this.userId }),
+      'filters.list',
     );
     return response.data.filter ?? [];
   }
@@ -27,8 +28,9 @@ export class FiltersClient extends GmailClientBase {
    * @returns The filter rule with criteria and actions
    */
   async get(id: string): Promise<gmail_v1.Schema$Filter> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.filters.get({ userId: this.userId, id }),
+    const response = await this.execute(
+      () => this.gmail.users.settings.filters.get({ userId: this.userId, id }),
+      'filters.get',
     );
     return response.data;
   }
@@ -43,11 +45,13 @@ export class FiltersClient extends GmailClientBase {
     criteria: gmail_v1.Schema$FilterCriteria,
     action: gmail_v1.Schema$FilterAction,
   ): Promise<gmail_v1.Schema$Filter> {
-    const response = await this.execute(() =>
-      this.gmail.users.settings.filters.create({
-        userId: this.userId,
-        requestBody: { criteria, action },
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.settings.filters.create({
+          userId: this.userId,
+          requestBody: { criteria, action },
+        }),
+      'filters.create',
     );
     return response.data;
   }
@@ -57,6 +61,9 @@ export class FiltersClient extends GmailClientBase {
    * @param id - The Gmail filter ID to delete
    */
   async delete(id: string): Promise<void> {
-    await this.execute(() => this.gmail.users.settings.filters.delete({ userId: this.userId, id }));
+    await this.execute(
+      () => this.gmail.users.settings.filters.delete({ userId: this.userId, id }),
+      'filters.delete',
+    );
   }
 }

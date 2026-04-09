@@ -23,13 +23,15 @@ export class DraftsClient extends GmailClientBase {
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }> {
-    const response = await this.execute(() =>
-      this.gmail.users.drafts.list({
-        userId: this.userId,
-        maxResults: options.maxResults ?? 10,
-        pageToken: options.pageToken,
-        q: options.query,
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.drafts.list({
+          userId: this.userId,
+          maxResults: options.maxResults ?? 10,
+          pageToken: options.pageToken,
+          q: options.query,
+        }),
+      'drafts.list',
     );
 
     return {
@@ -49,12 +51,9 @@ export class DraftsClient extends GmailClientBase {
    * @returns The raw Gmail API draft object
    */
   async get(id: string, format: MessageFormat = 'full'): Promise<gmail_v1.Schema$Draft> {
-    const response = await this.execute(() =>
-      this.gmail.users.drafts.get({
-        userId: this.userId,
-        id,
-        format,
-      }),
+    const response = await this.execute(
+      () => this.gmail.users.drafts.get({ userId: this.userId, id, format }),
+      'drafts.get',
     );
     return response.data;
   }
@@ -73,7 +72,7 @@ export class DraftsClient extends GmailClientBase {
       (id) => () =>
         this.gmail.users.drafts.get({ userId: this.userId, id, format }).then((r) => r.data),
     );
-    return this.batchExecute(fns);
+    return this.batchExecute(fns, 'drafts.batchGet');
   }
 
   /**
@@ -83,13 +82,13 @@ export class DraftsClient extends GmailClientBase {
    * @returns The created draft object
    */
   async create(raw: string, threadId?: string): Promise<gmail_v1.Schema$Draft> {
-    const response = await this.execute(() =>
-      this.gmail.users.drafts.create({
-        userId: this.userId,
-        requestBody: {
-          message: { raw, threadId },
-        },
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.drafts.create({
+          userId: this.userId,
+          requestBody: { message: { raw, threadId } },
+        }),
+      'drafts.create',
     );
     return response.data;
   }
@@ -102,14 +101,14 @@ export class DraftsClient extends GmailClientBase {
    * @returns The updated draft object
    */
   async update(id: string, raw: string, threadId?: string): Promise<gmail_v1.Schema$Draft> {
-    const response = await this.execute(() =>
-      this.gmail.users.drafts.update({
-        userId: this.userId,
-        id,
-        requestBody: {
-          message: { raw, threadId },
-        },
-      }),
+    const response = await this.execute(
+      () =>
+        this.gmail.users.drafts.update({
+          userId: this.userId,
+          id,
+          requestBody: { message: { raw, threadId } },
+        }),
+      'drafts.update',
     );
     return response.data;
   }
@@ -120,11 +119,9 @@ export class DraftsClient extends GmailClientBase {
    * @returns The sent message object with ID and thread info
    */
   async send(id: string): Promise<gmail_v1.Schema$Message> {
-    const response = await this.execute(() =>
-      this.gmail.users.drafts.send({
-        userId: this.userId,
-        requestBody: { id },
-      }),
+    const response = await this.execute(
+      () => this.gmail.users.drafts.send({ userId: this.userId, requestBody: { id } }),
+      'drafts.send',
     );
     return response.data;
   }
@@ -134,6 +131,9 @@ export class DraftsClient extends GmailClientBase {
    * @param id - The Gmail draft ID to delete
    */
   async delete(id: string): Promise<void> {
-    await this.execute(() => this.gmail.users.drafts.delete({ userId: this.userId, id }));
+    await this.execute(
+      () => this.gmail.users.drafts.delete({ userId: this.userId, id }),
+      'drafts.delete',
+    );
   }
 }

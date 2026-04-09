@@ -17,6 +17,8 @@ import { z } from 'zod';
 import { ensureAuthenticated } from './auth.js';
 import { logger } from './logger.js';
 import { GmailClient } from './client/index.js';
+import { GmailApiError, GmailValidationError } from './errors.js';
+import type { GmailToolkitError } from './types.js';
 
 const log = logger.child('mcp');
 import {
@@ -68,6 +70,42 @@ function isEnabled(name: ToolName): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: serialise caught errors into MCP tool error responses
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert any caught error into an MCP tool result with `isError: true`.
+ * Populates the `GmailToolkitError` DTO shape so callers get structured info.
+ * @param err - The caught error (any type — will be narrowed internally)
+ * @param toolName - The MCP tool name used as fallback operation label
+ * @returns An MCP tool result object with `isError: true` and JSON error content
+ */
+function toMcpError(
+  err: unknown,
+  toolName: string,
+): { content: Array<{ type: 'text'; text: string }>; isError: true } {
+  const errorDto: GmailToolkitError = {
+    code: err instanceof GmailApiError ? err.code : 0,
+    message: err instanceof Error ? err.message : String(err),
+    operation:
+      err instanceof GmailApiError
+        ? err.operation
+        : err instanceof GmailValidationError
+          ? err.operation
+          : toolName,
+    retryable: err instanceof GmailApiError ? err.retryable : false,
+    ...(err instanceof GmailValidationError && err.field !== undefined && err.field !== ''
+      ? { field: err.field }
+      : {}),
+  };
+  log.error(`Tool error [${toolName}]: ${errorDto.message}`);
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(errorDto, null, 2) }],
+    isError: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Read Tools
 // ---------------------------------------------------------------------------
 
@@ -87,8 +125,19 @@ if (isEnabled('gmail_search')) {
         ),
     },
     async ({ query, max_results, page_token, include_body }) => {
-      const result = await search(client, labelCache, query, max_results, page_token, include_body);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await search(
+          client,
+          labelCache,
+          query,
+          max_results,
+          page_token,
+          include_body,
+        );
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_search');
+      }
     },
   );
 }
@@ -102,8 +151,12 @@ if (isEnabled('gmail_read_message')) {
       include_html: z.boolean().optional().describe('Include raw HTML body (default false)'),
     },
     async ({ message_id, include_html }) => {
-      const result = await readMessage(client, labelCache, message_id, include_html);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await readMessage(client, labelCache, message_id, include_html);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_read_message');
+      }
     },
   );
 }
@@ -116,16 +169,24 @@ if (isEnabled('gmail_read_thread')) {
       thread_id: z.string().describe('Thread ID from search results or message'),
     },
     async ({ thread_id }) => {
-      const result = await readThread(client, labelCache, thread_id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await readThread(client, labelCache, thread_id);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_read_thread');
+      }
     },
   );
 }
 
 if (isEnabled('gmail_get_labels')) {
   server.tool('gmail_get_labels', toolRegistry.gmail_get_labels.description, {}, async () => {
-    const result = await getLabels(client, labelCache);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    try {
+      const result = await getLabels(client, labelCache);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return toMcpError(err, 'gmail_get_labels');
+    }
   });
 }
 
@@ -142,23 +203,35 @@ if (isEnabled('gmail_get_drafts')) {
         .describe('Include processed body text per draft (default false)'),
     },
     async ({ max_results, query, include_body }) => {
-      const result = await getDrafts(client, labelCache, max_results, query, include_body);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await getDrafts(client, labelCache, max_results, query, include_body);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_get_drafts');
+      }
     },
   );
 }
 
 if (isEnabled('gmail_get_filters')) {
   server.tool('gmail_get_filters', toolRegistry.gmail_get_filters.description, {}, async () => {
-    const result = await getFilters(client, labelCache);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    try {
+      const result = await getFilters(client, labelCache);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return toMcpError(err, 'gmail_get_filters');
+    }
   });
 }
 
 if (isEnabled('gmail_get_account')) {
   server.tool('gmail_get_account', toolRegistry.gmail_get_account.description, {}, async () => {
-    const result = await getAccount(client);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    try {
+      const result = await getAccount(client);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return toMcpError(err, 'gmail_get_account');
+    }
   });
 }
 
@@ -181,8 +254,12 @@ if (isEnabled('gmail_create_label')) {
         .describe('Label color'),
     },
     async ({ name, color }) => {
-      const result = await createLabel(client, labelCache, name, { color });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await createLabel(client, labelCache, name, { color });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_create_label');
+      }
     },
   );
 }
@@ -203,8 +280,12 @@ if (isEnabled('gmail_update_label')) {
         .describe('New color'),
     },
     async ({ label, new_name, color }) => {
-      const result = await updateLabel(client, labelCache, label, { new_name, color });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await updateLabel(client, labelCache, label, { new_name, color });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_update_label');
+      }
     },
   );
 }
@@ -219,14 +300,18 @@ if (isEnabled('gmail_modify_messages')) {
       remove_labels: z.array(z.string()).optional().describe('Label names to remove'),
     },
     async ({ message_ids, add_labels, remove_labels }) => {
-      const result = await modifyMessages(
-        client,
-        labelCache,
-        message_ids,
-        add_labels,
-        remove_labels,
-      );
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await modifyMessages(
+          client,
+          labelCache,
+          message_ids,
+          add_labels,
+          remove_labels,
+        );
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_modify_messages');
+      }
     },
   );
 }
@@ -241,8 +326,12 @@ if (isEnabled('gmail_modify_thread')) {
       remove_labels: z.array(z.string()).optional().describe('Label names to remove'),
     },
     async ({ thread_id, add_labels, remove_labels }) => {
-      const result = await modifyThread(client, labelCache, thread_id, add_labels, remove_labels);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await modifyThread(client, labelCache, thread_id, add_labels, remove_labels);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_modify_thread');
+      }
     },
   );
 }
@@ -261,16 +350,20 @@ if (isEnabled('gmail_create_draft')) {
       thread_id: z.string().optional().describe('Thread ID for reply drafts'),
     },
     async (params) => {
-      const result = await createDraft(client, {
-        to: params.to,
-        subject: params.subject,
-        body: params.body,
-        cc: params.cc,
-        bcc: params.bcc,
-        contentType: params.content_type,
-        threadId: params.thread_id,
-      });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await createDraft(client, {
+          to: params.to,
+          subject: params.subject,
+          body: params.body,
+          cc: params.cc,
+          bcc: params.bcc,
+          contentType: params.content_type,
+          threadId: params.thread_id,
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_create_draft');
+      }
     },
   );
 }
@@ -300,8 +393,12 @@ if (isEnabled('gmail_create_filter')) {
         .describe('Actions to apply on matching messages'),
     },
     async ({ criteria, actions }) => {
-      const result = await createFilter(client, labelCache, criteria, actions);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await createFilter(client, labelCache, criteria, actions);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_create_filter');
+      }
     },
   );
 }
@@ -316,8 +413,12 @@ if (isEnabled('gmail_send_draft')) {
     toolRegistry.gmail_send_draft.description,
     { draft_id: z.string().describe('Draft ID to send') },
     async ({ draft_id }) => {
-      const result = await sendDraft(client, draft_id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await sendDraft(client, draft_id);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_send_draft');
+      }
     },
   );
 }
@@ -336,16 +437,20 @@ if (isEnabled('gmail_send_message')) {
       thread_id: z.string().optional(),
     },
     async (params) => {
-      const result = await sendMessage(client, {
-        to: params.to,
-        subject: params.subject,
-        body: params.body,
-        cc: params.cc,
-        bcc: params.bcc,
-        contentType: params.content_type,
-        threadId: params.thread_id,
-      });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await sendMessage(client, {
+          to: params.to,
+          subject: params.subject,
+          body: params.body,
+          cc: params.cc,
+          bcc: params.bcc,
+          contentType: params.content_type,
+          threadId: params.thread_id,
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_send_message');
+      }
     },
   );
 }
@@ -356,8 +461,12 @@ if (isEnabled('gmail_trash_messages')) {
     toolRegistry.gmail_trash_messages.description,
     { message_ids: z.array(z.string()).describe('Message IDs to trash') },
     async ({ message_ids }) => {
-      const result = await trashMessages(client, message_ids);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await trashMessages(client, message_ids);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_trash_messages');
+      }
     },
   );
 }
@@ -368,8 +477,12 @@ if (isEnabled('gmail_trash_thread')) {
     toolRegistry.gmail_trash_thread.description,
     { thread_id: z.string().describe('Thread ID to trash') },
     async ({ thread_id }) => {
-      const result = await trashThread(client, thread_id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await trashThread(client, thread_id);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_trash_thread');
+      }
     },
   );
 }
@@ -380,8 +493,12 @@ if (isEnabled('gmail_delete_label')) {
     toolRegistry.gmail_delete_label.description,
     { label: z.string().describe('Label name or ID to delete') },
     async ({ label }) => {
-      const result = await deleteLabel(client, labelCache, label);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await deleteLabel(client, labelCache, label);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_delete_label');
+      }
     },
   );
 }
@@ -392,8 +509,12 @@ if (isEnabled('gmail_delete_filter')) {
     toolRegistry.gmail_delete_filter.description,
     { filter_id: z.string().describe('Filter ID to delete') },
     async ({ filter_id }) => {
-      const result = await deleteFilter(client, filter_id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await deleteFilter(client, filter_id);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_delete_filter');
+      }
     },
   );
 }
@@ -404,8 +525,12 @@ if (isEnabled('gmail_delete_draft')) {
     toolRegistry.gmail_delete_draft.description,
     { draft_id: z.string().describe('Draft ID to delete') },
     async ({ draft_id }) => {
-      const result = await deleteDraft(client, draft_id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await deleteDraft(client, draft_id);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return toMcpError(err, 'gmail_delete_draft');
+      }
     },
   );
 }
