@@ -2,10 +2,16 @@
  * Gmail Toolkit — Filter Composed Operations
  */
 
-import { GmailClient } from '../client/index.js';
-import { LabelCache } from './labels.js';
+import type { GmailClient } from '../client/index.js';
+import type { LabelCache } from './labels.js';
 import type { FilterOverview, FilterDetail } from '../types.js';
 
+/**
+ * Retrieve all Gmail filters with resolved label names.
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @returns An overview of all configured filters with resolved labels
+ */
 export async function getFilters(
   client: GmailClient,
   labelCache: LabelCache,
@@ -30,7 +36,7 @@ export async function getFilters(
         negated_query: raw.criteria?.negatedQuery ?? null,
         has_attachment: raw.criteria?.hasAttachment ?? null,
         size: raw.criteria?.size ?? null,
-        size_comparison: (raw.criteria?.sizeComparison as 'smaller' | 'larger') ?? null,
+        size_comparison: (raw.criteria?.sizeComparison as 'smaller' | 'larger' | undefined) ?? null,
       },
       actions: {
         add_labels: addLabels,
@@ -45,6 +51,27 @@ export async function getFilters(
   return { total: filters.length, filters };
 }
 
+/**
+ * Create a new Gmail filter that automatically processes matching messages.
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @param criteria - The conditions that trigger the filter
+ * @param criteria.from - Match messages from this sender
+ * @param criteria.to - Match messages to this recipient
+ * @param criteria.subject - Match messages with this subject
+ * @param criteria.query - Match messages matching this Gmail search query
+ * @param criteria.negated_query - Exclude messages matching this query
+ * @param criteria.has_attachment - Match messages with attachments
+ * @param criteria.size - Size threshold in bytes for matching
+ * @param criteria.size_comparison - Whether to match messages smaller or larger than size
+ * @param actions - The actions to perform on matching messages
+ * @param actions.add_labels - Labels to apply to matching messages
+ * @param actions.remove_labels - Labels to remove from matching messages
+ * @param actions.forward_to - Email address to forward matching messages to
+ * @param actions.skip_inbox - Whether to archive matching messages
+ * @param actions.mark_read - Whether to mark matching messages as read
+ * @returns The created filter with resolved label names
+ */
 export async function createFilter(
   client: GmailClient,
   labelCache: LabelCache,
@@ -67,18 +94,16 @@ export async function createFilter(
   },
 ): Promise<FilterDetail> {
   // Resolve label names to IDs
-  const addLabelIds = actions.add_labels
-    ? await labelCache.lookupMany(actions.add_labels)
-    : [];
+  const addLabelIds = actions.add_labels ? await labelCache.lookupMany(actions.add_labels) : [];
   const removeLabelIds = actions.remove_labels
     ? await labelCache.lookupMany(actions.remove_labels)
     : [];
 
   // Handle skip_inbox and mark_read as label removals
-  if (actions.skip_inbox && !removeLabelIds.includes('INBOX')) {
+  if (actions.skip_inbox === true && !removeLabelIds.includes('INBOX')) {
     removeLabelIds.push('INBOX');
   }
-  if (actions.mark_read && !removeLabelIds.includes('UNREAD')) {
+  if (actions.mark_read === true && !removeLabelIds.includes('UNREAD')) {
     removeLabelIds.push('UNREAD');
   }
 
@@ -113,7 +138,7 @@ export async function createFilter(
       negated_query: raw.criteria?.negatedQuery ?? null,
       has_attachment: raw.criteria?.hasAttachment ?? null,
       size: raw.criteria?.size ?? null,
-      size_comparison: (raw.criteria?.sizeComparison as 'smaller' | 'larger') ?? null,
+      size_comparison: (raw.criteria?.sizeComparison as 'smaller' | 'larger' | undefined) ?? null,
     },
     actions: {
       add_labels: resolvedAdd,

@@ -13,14 +13,23 @@
 // Registry Types
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 export type ToolCategory = 'read' | 'write' | 'destructive';
 
+/**
+ *
+ */
 export interface ToolConfig {
   readonly enabled: boolean;
   readonly category: ToolCategory;
   readonly description: string;
 }
 
+/**
+ *
+ */
 export type ToolName = keyof typeof DEFAULT_TOOL_REGISTRY;
 
 // ---------------------------------------------------------------------------
@@ -32,7 +41,8 @@ const DEFAULT_TOOL_REGISTRY = {
   gmail_search: {
     enabled: true,
     category: 'read' as const,
-    description: 'Search messages by Gmail query (e.g., "is:unread from:chase")',
+    description:
+      'Search messages by Gmail query. Set include_body=true to get processed body text inline (eliminates separate read calls).',
   },
   gmail_read_message: {
     enabled: true,
@@ -62,7 +72,8 @@ const DEFAULT_TOOL_REGISTRY = {
   gmail_get_account: {
     enabled: true,
     category: 'read' as const,
-    description: 'Get account overview: profile, vacation, forwarding, aliases, delegates, IMAP/POP',
+    description:
+      'Get account overview: profile, vacation, forwarding, aliases, delegates, IMAP/POP',
   },
 
   // === Non-destructive writes (enabled by default) ===
@@ -96,6 +107,18 @@ const DEFAULT_TOOL_REGISTRY = {
     category: 'write' as const,
     description: 'Create a new filter rule with criteria and actions',
   },
+  gmail_delete_label: {
+    enabled: true,
+    category: 'write' as const,
+    description:
+      'Delete a label (messages are NOT deleted, just un-labeled). Returns count of affected messages.',
+  },
+  gmail_delete_filter: {
+    enabled: true,
+    category: 'write' as const,
+    description:
+      'Delete a filter rule (stops future auto-processing). Returns summary of deleted filter criteria.',
+  },
 
   // === Destructive (disabled by default, opt-in) ===
   gmail_send_draft: {
@@ -118,16 +141,6 @@ const DEFAULT_TOOL_REGISTRY = {
     category: 'destructive' as const,
     description: 'Move an entire thread to Trash (recoverable within 30 days)',
   },
-  gmail_delete_label: {
-    enabled: false,
-    category: 'destructive' as const,
-    description: 'Permanently delete a label (removes from all messages)',
-  },
-  gmail_delete_filter: {
-    enabled: false,
-    category: 'destructive' as const,
-    description: 'Permanently delete a filter rule',
-  },
   gmail_delete_draft: {
     enabled: false,
     category: 'destructive' as const,
@@ -148,6 +161,7 @@ const DEFAULT_TOOL_REGISTRY = {
  *   GMAIL_DISABLE_TOOLS — comma-separated tool names to force-disable
  *
  * GMAIL_DISABLE_TOOLS takes precedence over GMAIL_ENABLE_TOOLS.
+ * @returns The complete tool registry with environment overrides applied
  */
 export function resolveToolRegistry(): Record<ToolName, ToolConfig> {
   const registry = structuredClone(DEFAULT_TOOL_REGISTRY) as Record<ToolName, ToolConfig>;
@@ -172,6 +186,7 @@ export function resolveToolRegistry(): Record<ToolName, ToolConfig> {
 
 /**
  * Returns only the tools that are currently enabled.
+ * @returns An array of [name, config] pairs for enabled tools
  */
 export function getEnabledTools(): Array<[ToolName, ToolConfig]> {
   const registry = resolveToolRegistry();
@@ -182,6 +197,7 @@ export function getEnabledTools(): Array<[ToolName, ToolConfig]> {
 
 /**
  * Returns all tool names grouped by category.
+ * @returns A record mapping each category to its tool names
  */
 export function getToolsByCategory(): Record<ToolCategory, ToolName[]> {
   const registry = resolveToolRegistry();
@@ -203,11 +219,13 @@ export function getToolsByCategory(): Record<ToolCategory, ToolName[]> {
 // ---------------------------------------------------------------------------
 
 function parseToolList(envVar: string | undefined): string[] {
-  if (!envVar) return [];
+  if (envVar == null || envVar === '') {
+    return [];
+  }
   return envVar
     .split(',')
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter((s) => s !== '');
 }
 
 export { DEFAULT_TOOL_REGISTRY };

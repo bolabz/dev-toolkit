@@ -4,11 +4,13 @@
  * 1:1 mapping to Gmail API v1 messages.* endpoints.
  */
 
-import { gmail_v1 } from 'googleapis';
+import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase } from './base.js';
 
+/** Format options for retrieving Gmail messages. */
 export type MessageFormat = 'minimal' | 'metadata' | 'full' | 'raw';
 
+/** Query options for listing Gmail messages. */
 export interface ListMessagesOptions {
   query?: string;
   maxResults?: number;
@@ -17,10 +19,13 @@ export interface ListMessagesOptions {
   includeSpamTrash?: boolean;
 }
 
+/** Client for Gmail messages.* API endpoints with rate limiting. */
 export class MessagesClient extends GmailClientBase {
   /**
    * List message IDs matching a query.
    * Returns IDs only — use get() or batchGet() for full data.
+   * @param options - Query, pagination, and filter options
+   * @returns Matching message IDs with pagination metadata
    */
   async list(options: ListMessagesOptions = {}): Promise<{
     messages: Array<{ id: string; threadId: string }>;
@@ -40,8 +45,8 @@ export class MessagesClient extends GmailClientBase {
 
     return {
       messages: (response.data.messages ?? []).map((m) => ({
-        id: m.id!,
-        threadId: m.threadId!,
+        id: m.id ?? '',
+        threadId: m.threadId ?? '',
       })),
       nextPageToken: response.data.nextPageToken ?? null,
       resultSizeEstimate: response.data.resultSizeEstimate ?? 0,
@@ -50,6 +55,10 @@ export class MessagesClient extends GmailClientBase {
 
   /**
    * Get a single message by ID.
+   * @param id - The Gmail message ID
+   * @param format - Response format (full, metadata, minimal, raw)
+   * @param metadataHeaders - Specific headers to include in metadata format
+   * @returns The raw Gmail API message object
    */
   async get(
     id: string,
@@ -69,27 +78,36 @@ export class MessagesClient extends GmailClientBase {
 
   /**
    * Get multiple messages by ID (concurrent through rate limiter).
+   * @param ids - The Gmail message IDs to fetch
+   * @param format - Response format for all messages
+   * @param metadataHeaders - Specific headers to include in metadata format
+   * @returns The raw Gmail API message objects
    */
   async batchGet(
     ids: string[],
     format: MessageFormat = 'full',
     metadataHeaders?: string[],
   ): Promise<gmail_v1.Schema$Message[]> {
-    const fns = ids.map((id) => () =>
-      this.gmail.users.messages
-        .get({
-          userId: this.userId,
-          id,
-          format,
-          metadataHeaders,
-        })
-        .then((r) => r.data),
+    const fns = ids.map(
+      (id) => () =>
+        this.gmail.users.messages
+          .get({
+            userId: this.userId,
+            id,
+            format,
+            metadataHeaders,
+          })
+          .then((r) => r.data),
     );
     return this.batchExecute(fns);
   }
 
   /**
    * Modify labels on a single message.
+   * @param id - The Gmail message ID
+   * @param addLabelIds - Label IDs to apply
+   * @param removeLabelIds - Label IDs to remove
+   * @returns The updated message object
    */
   async modify(
     id: string,
@@ -108,6 +126,9 @@ export class MessagesClient extends GmailClientBase {
 
   /**
    * Modify labels on up to 1000 messages in a single call.
+   * @param ids - The Gmail message IDs to modify
+   * @param addLabelIds - Label IDs to apply to all messages
+   * @param removeLabelIds - Label IDs to remove from all messages
    */
   async batchModify(
     ids: string[],
@@ -124,6 +145,9 @@ export class MessagesClient extends GmailClientBase {
 
   /**
    * Send a message (RFC 2822 base64url-encoded).
+   * @param raw - The base64url-encoded RFC 2822 message
+   * @param threadId - Optional thread ID to associate the message with
+   * @returns The sent message object with ID and thread info
    */
   async send(raw: string, threadId?: string): Promise<gmail_v1.Schema$Message> {
     const response = await this.execute(() =>
@@ -137,6 +161,8 @@ export class MessagesClient extends GmailClientBase {
 
   /**
    * Move a message to Trash (recoverable for 30 days).
+   * @param id - The Gmail message ID to trash
+   * @returns The updated message object
    */
   async trash(id: string): Promise<gmail_v1.Schema$Message> {
     const response = await this.execute(() =>
@@ -147,6 +173,8 @@ export class MessagesClient extends GmailClientBase {
 
   /**
    * Recover a message from Trash.
+   * @param id - The Gmail message ID to restore
+   * @returns The restored message object
    */
   async untrash(id: string): Promise<gmail_v1.Schema$Message> {
     const response = await this.execute(() =>
@@ -157,15 +185,17 @@ export class MessagesClient extends GmailClientBase {
 
   /**
    * Permanently delete a message. Cannot be undone.
+   * @param id - The Gmail message ID to permanently delete
    */
   async delete(id: string): Promise<void> {
-    await this.execute(() =>
-      this.gmail.users.messages.delete({ userId: this.userId, id }),
-    );
+    await this.execute(() => this.gmail.users.messages.delete({ userId: this.userId, id }));
   }
 
   /**
-   * Get attachment data.
+   * Get attachment data for a message.
+   * @param messageId - The Gmail message ID containing the attachment
+   * @param attachmentId - The attachment ID within the message
+   * @returns The base64-encoded attachment data and size in bytes
    */
   async getAttachment(
     messageId: string,

@@ -4,30 +4,27 @@
  * Fires all 8 settings endpoints in parallel (~200ms, ~1KB total, 8 quota units).
  */
 
-import { GmailClient } from '../client/index.js';
+import type { GmailClient } from '../client/index.js';
 import type { AccountOverview } from '../types.js';
 
+/**
+ * Get account information including profile, vacation, and forwarding settings.
+ * @param client - The authenticated Gmail API client
+ * @returns A comprehensive overview of the authenticated Gmail account
+ */
 export async function getAccount(client: GmailClient): Promise<AccountOverview> {
   // All 8 calls in parallel — tiny responses, minimal quota
-  const [
-    profile,
-    vacation,
-    forwarding,
-    sendAs,
-    delegates,
-    forwardingAddresses,
-    imap,
-    pop,
-  ] = await Promise.all([
-    client.settings.getProfile(),
-    client.settings.getVacation(),
-    client.settings.getAutoForwarding(),
-    client.settings.listSendAs(),
-    client.settings.listDelegates().catch(() => []), // May fail without delegate scope
-    client.settings.listForwardingAddresses(),
-    client.settings.getImap(),
-    client.settings.getPop(),
-  ]);
+  const [profile, vacation, forwarding, sendAs, delegates, forwardingAddresses, imap, pop] =
+    await Promise.all([
+      client.settings.getProfile(),
+      client.settings.getVacation(),
+      client.settings.getAutoForwarding(),
+      client.settings.listSendAs(),
+      client.settings.listDelegates().catch(() => []), // May fail without delegate scope
+      client.settings.listForwardingAddresses(),
+      client.settings.getImap(),
+      client.settings.getPop(),
+    ]);
 
   return {
     email: profile.emailAddress ?? '',
@@ -37,8 +34,8 @@ export async function getAccount(client: GmailClient): Promise<AccountOverview> 
     vacation: {
       enabled: vacation.enableAutoReply ?? false,
       subject: vacation.responseSubject ?? null,
-      start: vacation.startTime ? new Date(Number(vacation.startTime)).toISOString() : null,
-      end: vacation.endTime ? new Date(Number(vacation.endTime)).toISOString() : null,
+      start: vacation.startTime != null ? new Date(Number(vacation.startTime)).toISOString() : null,
+      end: vacation.endTime != null ? new Date(Number(vacation.endTime)).toISOString() : null,
       restrict_to_contacts: vacation.restrictToContacts ?? false,
     },
     forwarding: {

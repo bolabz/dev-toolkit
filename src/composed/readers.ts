@@ -2,18 +2,33 @@
  * Gmail Toolkit — Read Message / Read Thread Composed Operations
  */
 
-import { gmail_v1 } from 'googleapis';
-import { GmailClient } from '../client/index.js';
-import { LabelCache } from './labels.js';
+import type { gmail_v1 } from 'googleapis';
+import type { GmailClient } from '../client/index.js';
+import type { LabelCache } from './labels.js';
 import { processMessagePayload } from './body-processing.js';
-import { parseContact, parseContactList, deduplicateContacts } from './helpers.js';
+import {
+  parseContact,
+  parseContactList,
+  deduplicateContacts,
+  gmailWebUrl,
+  headerMap,
+  parseDate,
+  isUserLabel,
+} from './helpers.js';
 import type { FullMessage, FullThread, Contact, AttachmentInfo } from '../types.js';
-import he from 'he';
 
 // ---------------------------------------------------------------------------
 // Read Single Message
 // ---------------------------------------------------------------------------
 
+/**
+ * Read a single message with full headers, body, and metadata.
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @param messageId - The Gmail message ID to read
+ * @param includeHtml - Whether to include raw HTML alongside plain text
+ * @returns The fully resolved message with parsed contacts and labels
+ */
 export async function readMessage(
   client: GmailClient,
   labelCache: LabelCache,
@@ -28,10 +43,19 @@ export async function readMessage(
 // Read Thread
 // ---------------------------------------------------------------------------
 
+/**
+ * Read an entire conversation thread with all messages and timeline.
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @param threadId - The Gmail thread ID to read
+ * @param includeLabelContext - Whether to include label context for the thread
+ * @returns The thread with all messages, participants, and timeline
+ */
 export async function readThread(
   client: GmailClient,
   labelCache: LabelCache,
   threadId: string,
+  includeLabelContext = true,
 ): Promise<FullThread> {
   const raw = await client.threads.get(threadId, 'full');
   const rawMessages = raw.messages ?? [];
@@ -40,9 +64,15 @@ export async function readThread(
   const messages: FullMessage[] = [];
   const allParticipants: Contact[] = [];
   const allLabels = new Set<string>();
+  const allLabelIds = new Set<string>();
   let hasUnread = false;
 
   for (const msg of rawMessages) {
+    // Collect raw label IDs before resolution
+    for (const lid of msg.labelIds ?? []) {
+      allLabelIds.add(lid);
+    }
+
     const transformed = await transformMessage(msg, labelCache, {
       stripReplies: false,
       includeHtml: false,
@@ -52,6 +82,30 @@ export async function readThread(
     allParticipants.push(transformed.from, ...transformed.to, ...transformed.cc);
     transformed.labels.forEach((l) => allLabels.add(l));
     if (transformed.is_unread) hasUnread = true;
+  }
+
+  // Build label context: fetch counts for user labels on this thread
+  let labelContext:
+    | Array<{ name: string; messages_total: number; messages_unread: number }>
+    | undefined;
+  if (includeLabelContext) {
+    const userLabelIds = Array.from(allLabelIds).filter(isUserLabel);
+    if (userLabelIds.length > 0) {
+      try {
+        const detailed = await client.labels.batchGet(userLabelIds);
+        labelContext = detailed.map((l) => ({
+          name: l.name ?? l.id ?? '',
+          messages_total: l.messagesTotal ?? 0,
+          messages_unread: l.messagesUnread ?? 0,
+        }));
+      } catch {
+        // Non-fatal — return empty array rather than omitting
+        labelContext = [];
+      }
+    } else {
+      // No user labels on this thread — explicitly return empty array
+      labelContext = [];
+    }
   }
 
   const firstDate = messages[0]?.date ?? '';
@@ -64,6 +118,7 @@ export async function readThread(
     message_count: messages.length,
     messages,
     labels: Array.from(allLabels),
+    label_context: labelContext,
     has_unread: hasUnread,
     date_range: {
       first: firstDate,
@@ -108,6 +163,7 @@ async function transformMessage(
     body_html: html,
     attachments: extractAttachments(raw.payload),
     size_bytes: raw.sizeEstimate ?? 0,
+    web_url: gmailWebUrl(raw.id ?? ''),
   };
 }
 
@@ -115,33 +171,17 @@ async function transformMessage(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function headerMap(headers: gmail_v1.Schema$MessagePartHeader[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const h of headers) {
-    if (h.name && h.value) map.set(h.name, h.value);
-  }
-  return map;
-}
-
-function parseDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toISOString();
-  } catch {
-    return dateStr;
-  }
-}
-
 function extractAttachments(payload: gmail_v1.Schema$MessagePart | undefined): AttachmentInfo[] {
   const attachments: AttachmentInfo[] = [];
   if (!payload) return attachments;
 
   function walk(part: gmail_v1.Schema$MessagePart) {
-    if (part.filename && part.filename.length > 0 && part.body?.attachmentId) {
+    if (part.filename != null && part.filename.length > 0) {
       attachments.push({
-        id: part.body.attachmentId,
+        id: part.body?.attachmentId ?? '',
         filename: part.filename,
         mime_type: part.mimeType ?? 'application/octet-stream',
-        size_bytes: part.body.size ?? 0,
+        size_bytes: part.body?.size ?? 0,
       });
     }
     for (const child of part.parts ?? []) {

@@ -13,25 +13,40 @@ import { z } from 'zod';
 // Primitives
 // ---------------------------------------------------------------------------
 
-export const ContactSchema = z.object({
+export /**
+ *
+ */
+const ContactSchema = z.object({
   name: z.string().nullable(),
   email: z.string(),
 });
+/**
+ *
+ */
 export type Contact = z.infer<typeof ContactSchema>;
 
-export const AttachmentInfoSchema = z.object({
+export /**
+ *
+ */
+const AttachmentInfoSchema = z.object({
   id: z.string(),
   filename: z.string(),
   mime_type: z.string(),
   size_bytes: z.number(),
 });
+/**
+ *
+ */
 export type AttachmentInfo = z.infer<typeof AttachmentInfoSchema>;
 
 // ---------------------------------------------------------------------------
 // Search / List Results
 // ---------------------------------------------------------------------------
 
-export const MessageSummarySchema = z.object({
+export /**
+ *
+ */
+const MessageSummarySchema = z.object({
   id: z.string(),
   thread_id: z.string(),
   from: ContactSchema,
@@ -45,30 +60,50 @@ export const MessageSummarySchema = z.object({
   is_starred: z.boolean(),
   has_attachments: z.boolean(),
   size_bytes: z.number(),
+  web_url: z.string(),
+  body_text: z.string().nullable().optional(),
 });
+/**
+ *
+ */
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
 
-export const SearchSummarySchema = z.object({
+export /**
+ *
+ */
+const SearchSummarySchema = z.object({
   unread_count: z.number(),
   senders: z.record(z.string(), z.number()),
   labels: z.record(z.string(), z.number()),
 });
+/**
+ *
+ */
 export type SearchSummary = z.infer<typeof SearchSummarySchema>;
 
-export const SearchResultSchema = z.object({
+export /**
+ *
+ */
+const SearchResultSchema = z.object({
   total_estimate: z.number(),
   returned: z.number(),
   next_page_token: z.string().nullable(),
   messages: z.array(MessageSummarySchema),
   summary: SearchSummarySchema,
 });
+/**
+ *
+ */
 export type SearchResult = z.infer<typeof SearchResultSchema>;
 
 // ---------------------------------------------------------------------------
 // Full Message
 // ---------------------------------------------------------------------------
 
-export const FullMessageSchema = z.object({
+export /**
+ *
+ */
+const FullMessageSchema = z.object({
   id: z.string(),
   thread_id: z.string(),
   from: ContactSchema,
@@ -84,33 +119,60 @@ export const FullMessageSchema = z.object({
   body_html: z.string().nullable(),
   attachments: z.array(AttachmentInfoSchema),
   size_bytes: z.number(),
+  web_url: z.string(),
 });
+/**
+ *
+ */
 export type FullMessage = z.infer<typeof FullMessageSchema>;
 
 // ---------------------------------------------------------------------------
 // Full Thread
 // ---------------------------------------------------------------------------
 
-export const FullThreadSchema = z.object({
+export /**
+ *
+ */
+const LabelContextSchema = z.object({
+  name: z.string(),
+  messages_total: z.number(),
+  messages_unread: z.number(),
+});
+/**
+ *
+ */
+export type LabelContext = z.infer<typeof LabelContextSchema>;
+
+export /**
+ *
+ */
+const FullThreadSchema = z.object({
   id: z.string(),
   subject: z.string(),
   participants: z.array(ContactSchema),
   message_count: z.number(),
   messages: z.array(FullMessageSchema),
   labels: z.array(z.string()),
+  label_context: z.array(LabelContextSchema).optional(),
   has_unread: z.boolean(),
   date_range: z.object({
     first: z.string(),
     last: z.string(),
   }),
 });
+/**
+ *
+ */
 export type FullThread = z.infer<typeof FullThreadSchema>;
 
 // ---------------------------------------------------------------------------
 // Labels
 // ---------------------------------------------------------------------------
 
-export const LabelDetailSchema = z.object({
+export /**
+ *
+ */
+const LabelDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(['system', 'user']),
@@ -126,9 +188,15 @@ export const LabelDetailSchema = z.object({
     .nullable(),
   visibility: z.string(),
 });
+/**
+ *
+ */
 export type LabelDetail = z.infer<typeof LabelDetailSchema>;
 
-export const LabelOverviewSchema = z.object({
+export /**
+ *
+ */
+const LabelOverviewSchema = z.object({
   system_labels: z.array(LabelDetailSchema),
   user_labels: z.array(LabelDetailSchema),
   categories: z.array(LabelDetailSchema),
@@ -138,13 +206,19 @@ export const LabelOverviewSchema = z.object({
     most_active: z.string(),
   }),
 });
+/**
+ *
+ */
 export type LabelOverview = z.infer<typeof LabelOverviewSchema>;
 
 // ---------------------------------------------------------------------------
 // Drafts
 // ---------------------------------------------------------------------------
 
-export const DraftDetailSchema = z.object({
+export /**
+ *
+ */
+const DraftDetailSchema = z.object({
   draft_id: z.string(),
   message_id: z.string(),
   thread_id: z.string().nullable(),
@@ -155,20 +229,33 @@ export const DraftDetailSchema = z.object({
   date: z.string(),
   size_bytes: z.number(),
   has_attachments: z.boolean(),
+  body_text: z.string().nullable().optional(),
 });
+/**
+ *
+ */
 export type DraftDetail = z.infer<typeof DraftDetailSchema>;
 
-export const DraftSummarySchema = z.object({
+export /**
+ *
+ */
+const DraftSummarySchema = z.object({
   total: z.number(),
   drafts: z.array(DraftDetailSchema),
 });
+/**
+ *
+ */
 export type DraftSummary = z.infer<typeof DraftSummarySchema>;
 
 // ---------------------------------------------------------------------------
 // Filters
 // ---------------------------------------------------------------------------
 
-export const FilterCriteriaSchema = z.object({
+export /**
+ *
+ */
+const FilterCriteriaSchema = z.object({
   from: z.string().nullable(),
   to: z.string().nullable(),
   subject: z.string().nullable(),
@@ -178,35 +265,59 @@ export const FilterCriteriaSchema = z.object({
   size: z.number().nullable(),
   size_comparison: z.enum(['smaller', 'larger']).nullable(),
 });
+/**
+ *
+ */
 export type FilterCriteria = z.infer<typeof FilterCriteriaSchema>;
 
-export const FilterActionsSchema = z.object({
+export /**
+ *
+ */
+const FilterActionsSchema = z.object({
   add_labels: z.array(z.string()),
   remove_labels: z.array(z.string()),
   forward_to: z.string().nullable(),
   skip_inbox: z.boolean(),
   mark_read: z.boolean(),
 });
+/**
+ *
+ */
 export type FilterActions = z.infer<typeof FilterActionsSchema>;
 
-export const FilterDetailSchema = z.object({
+export /**
+ *
+ */
+const FilterDetailSchema = z.object({
   id: z.string(),
   criteria: FilterCriteriaSchema,
   actions: FilterActionsSchema,
 });
+/**
+ *
+ */
 export type FilterDetail = z.infer<typeof FilterDetailSchema>;
 
-export const FilterOverviewSchema = z.object({
+export /**
+ *
+ */
+const FilterOverviewSchema = z.object({
   total: z.number(),
   filters: z.array(FilterDetailSchema),
 });
+/**
+ *
+ */
 export type FilterOverview = z.infer<typeof FilterOverviewSchema>;
 
 // ---------------------------------------------------------------------------
 // Account
 // ---------------------------------------------------------------------------
 
-export const AccountOverviewSchema = z.object({
+export /**
+ *
+ */
+const AccountOverviewSchema = z.object({
   email: z.string(),
   messages_total: z.number(),
   threads_total: z.number(),
@@ -246,36 +357,97 @@ export const AccountOverviewSchema = z.object({
   imap_enabled: z.boolean(),
   pop_enabled: z.boolean(),
 });
+/**
+ *
+ */
 export type AccountOverview = z.infer<typeof AccountOverviewSchema>;
 
 // ---------------------------------------------------------------------------
 // Write Operation Results
 // ---------------------------------------------------------------------------
 
-export const ModifyResultSchema = z.object({
+export /**
+ *
+ */
+const ModifyResultSchema = z.object({
   modified: z.number(),
   failed: z.array(z.string()),
+  message: z.string(),
 });
+/**
+ *
+ */
 export type ModifyResult = z.infer<typeof ModifyResultSchema>;
 
-export const DeleteResultSchema = z.object({
+export /**
+ *
+ */
+const DeleteResultSchema = z.object({
   deleted: z.boolean(),
+  message: z.string(),
 });
+/**
+ *
+ */
 export type DeleteResult = z.infer<typeof DeleteResultSchema>;
 
-export const SendResultSchema = z.object({
-  message_id: z.string(),
+export /**
+ *
+ */
+const DeleteLabelResultSchema = z.object({
+  deleted: z.boolean(),
+  label_name: z.string(),
+  label_id: z.string(),
+  messages_affected: z.number(),
+  threads_affected: z.number(),
+  message: z.string(),
 });
+/**
+ *
+ */
+export type DeleteLabelResult = z.infer<typeof DeleteLabelResultSchema>;
+
+export /**
+ *
+ */
+const DeleteFilterResultSchema = z.object({
+  deleted: z.boolean(),
+  filter_id: z.string(),
+  criteria_summary: z.string(),
+  message: z.string(),
+});
+/**
+ *
+ */
+export type DeleteFilterResult = z.infer<typeof DeleteFilterResultSchema>;
+
+export /**
+ *
+ */
+const SendResultSchema = z.object({
+  message_id: z.string(),
+  thread_id: z.string().nullable(),
+  message: z.string(),
+});
+/**
+ *
+ */
 export type SendResult = z.infer<typeof SendResultSchema>;
 
 // ---------------------------------------------------------------------------
 // Error
 // ---------------------------------------------------------------------------
 
-export const GmailToolkitErrorSchema = z.object({
+export /**
+ *
+ */
+const GmailToolkitErrorSchema = z.object({
   code: z.number(),
   message: z.string(),
   operation: z.string(),
   retryable: z.boolean(),
 });
+/**
+ *
+ */
 export type GmailToolkitError = z.infer<typeof GmailToolkitErrorSchema>;
