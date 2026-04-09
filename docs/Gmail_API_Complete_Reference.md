@@ -28,16 +28,16 @@
 
 ### OAuth 2.0 Scopes
 
-| Scope | Access Level |
-|-------|-------------|
-| `gmail.readonly` | Read-only: messages, threads, labels, settings, drafts |
-| `gmail.modify` | Read + write: messages, threads, labels (not settings, not send) |
-| `gmail.labels` | Labels only: create, update, delete |
-| `gmail.send` | Send messages only |
-| `gmail.compose` | Create/modify/send drafts |
-| `gmail.settings.basic` | Manage filters, forwarding, IMAP/POP, vacation |
-| `gmail.settings.sharing` | Manage delegates |
-| `mail.google.com` | Full unrestricted access |
+| Scope                    | Access Level                                                     |
+| ------------------------ | ---------------------------------------------------------------- |
+| `gmail.readonly`         | Read-only: messages, threads, labels, settings, drafts           |
+| `gmail.modify`           | Read + write: messages, threads, labels (not settings, not send) |
+| `gmail.labels`           | Labels only: create, update, delete                              |
+| `gmail.send`             | Send messages only                                               |
+| `gmail.compose`          | Create/modify/send drafts                                        |
+| `gmail.settings.basic`   | Manage filters, forwarding, IMAP/POP, vacation                   |
+| `gmail.settings.sharing` | Manage delegates                                                 |
+| `mail.google.com`        | Full unrestricted access                                         |
 
 **Recommended for full MCP server:** `gmail.modify` + `gmail.settings.basic` + `gmail.compose`
 
@@ -45,24 +45,24 @@ This covers everything except delegate management (`gmail.settings.sharing`) whi
 
 ### Rate Limits
 
-| Limit Type | Value |
-|-----------|-------|
-| Per-project daily quota | 1,000,000,000 quota units |
-| Per-user rate limit | 250 quota units/second (allows bursts) |
+| Limit Type              | Value                                  |
+| ----------------------- | -------------------------------------- |
+| Per-project daily quota | 1,000,000,000 quota units              |
+| Per-user rate limit     | 250 quota units/second (allows bursts) |
 
 ### Quota Units by Operation Type
 
-| Operation | Approximate Cost |
-|----------|-----------------|
-| `labels.list`, `labels.get` | 1 unit |
-| `messages.list`, `threads.list` | 5 units |
-| `messages.get` (minimal) | 5 units |
-| `messages.get` (full/metadata) | 5 units |
-| `messages.modify`, `threads.modify` | 5 units |
-| `messages.batchModify` | 50 units |
-| `drafts.create`, `drafts.update` | 10 units |
-| `messages.send`, `drafts.send` | 100 units |
-| `filters.create`, `filters.delete` | 5 units |
+| Operation                           | Approximate Cost |
+| ----------------------------------- | ---------------- |
+| `labels.list`, `labels.get`         | 1 unit           |
+| `messages.list`, `threads.list`     | 5 units          |
+| `messages.get` (minimal)            | 5 units          |
+| `messages.get` (full/metadata)      | 5 units          |
+| `messages.modify`, `threads.modify` | 5 units          |
+| `messages.batchModify`              | 50 units         |
+| `drafts.create`, `drafts.update`    | 10 units         |
+| `messages.send`, `drafts.send`      | 100 units        |
+| `filters.create`, `filters.delete`  | 5 units          |
 
 ---
 
@@ -76,14 +76,14 @@ This covers everything except delegate management (`gmail.settings.sharing`) whi
 
 **Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `userId` | path string | Yes | Email address or "me" |
-| `q` | query string | No | Gmail search query syntax |
-| `labelIds` | query string[] | No | Filter by label IDs (repeated param) |
-| `maxResults` | query integer | No | Default 100, max 500 |
-| `pageToken` | query string | No | Pagination token |
-| `includeSpamTrash` | query boolean | No | Default false |
+| Param              | Type           | Required | Description                          |
+| ------------------ | -------------- | -------- | ------------------------------------ |
+| `userId`           | path string    | Yes      | Email address or "me"                |
+| `q`                | query string   | No       | Gmail search query syntax            |
+| `labelIds`         | query string[] | No       | Filter by label IDs (repeated param) |
+| `maxResults`       | query integer  | No       | Default 100, max 500                 |
+| `pageToken`        | query string   | No       | Pagination token                     |
+| `includeSpamTrash` | query boolean  | No       | Default false                        |
 
 **Response:**
 
@@ -108,21 +108,21 @@ This covers everything except delegate management (`gmail.settings.sharing`) whi
 
 **Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `userId` | path string | Yes | Email address or "me" |
-| `id` | path string | Yes | Message ID |
-| `format` | query string | No | Response detail level (see below) |
-| `metadataHeaders` | query string[] | No | Headers to include when format=METADATA |
+| Param             | Type           | Required | Description                             |
+| ----------------- | -------------- | -------- | --------------------------------------- |
+| `userId`          | path string    | Yes      | Email address or "me"                   |
+| `id`              | path string    | Yes      | Message ID                              |
+| `format`          | query string   | No       | Response detail level (see below)       |
+| `metadataHeaders` | query string[] | No       | Headers to include when format=METADATA |
 
 **Format Options (critical for aggregation design):**
 
-| Format | Returns | Excludes | Use Case |
-|--------|---------|----------|----------|
-| `MINIMAL` | id, threadId, labelIds, snippet, historyId, internalDate, sizeEstimate | All headers, body, payload | Bulk label/status checks |
-| `METADATA` | Everything in MINIMAL + payload.headers (filtered by metadataHeaders param) | Body content, attachments | Inbox summaries, triage |
-| `FULL` (default) | Complete parsed message: all headers, body parts, attachment metadata | Raw RFC 2822 string | Reading a specific email |
-| `RAW` | id, threadId, labelIds, snippet, historyId, internalDate, sizeEstimate, raw (base64url RFC 2822) | Parsed payload | Forwarding, export, re-import |
+| Format           | Returns                                                                                          | Excludes                   | Use Case                      |
+| ---------------- | ------------------------------------------------------------------------------------------------ | -------------------------- | ----------------------------- |
+| `MINIMAL`        | id, threadId, labelIds, snippet, historyId, internalDate, sizeEstimate                           | All headers, body, payload | Bulk label/status checks      |
+| `METADATA`       | Everything in MINIMAL + payload.headers (filtered by metadataHeaders param)                      | Body content, attachments  | Inbox summaries, triage       |
+| `FULL` (default) | Complete parsed message: all headers, body parts, attachment metadata                            | Raw RFC 2822 string        | Reading a specific email      |
+| `RAW`            | id, threadId, labelIds, snippet, historyId, internalDate, sizeEstimate, raw (base64url RFC 2822) | Parsed payload             | Forwarding, export, re-import |
 
 **Full Response Schema (format=FULL):**
 
@@ -157,6 +157,7 @@ This covers everything except delegate management (`gmail.settings.sharing`) whi
 ```
 
 **MessagePart recursive structure:**
+
 - `multipart/mixed` → contains body + attachments as `parts[]`
 - `multipart/alternative` → contains text/plain + text/html as `parts[]`
 - `text/plain` or `text/html` → leaf node with `body.data`
@@ -193,6 +194,7 @@ This covers everything except delegate management (`gmail.settings.sharing`) whi
 **Response:** Full Message object (minimal format — id, threadId, labelIds).
 
 **Common label operations (all done via modify):**
+
 - Archive = removeLabelIds: ["INBOX"]
 - Star = addLabelIds: ["STARRED"]
 - Mark read = removeLabelIds: ["UNREAD"]
@@ -208,7 +210,7 @@ This covers everything except delegate management (`gmail.settings.sharing`) whi
 
 ```json
 {
-  "ids": ["string"],          // max 1000 message IDs per call
+  "ids": ["string"], // max 1000 message IDs per call
   "addLabelIds": ["string"],
   "removeLabelIds": ["string"]
 }
@@ -239,12 +241,12 @@ This covers everything except delegate management (`gmail.settings.sharing`) whi
 
 **Parameters:**
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `internalDateSource` | query string | "receivedTime" or "dateHeader" |
-| `neverMarkSpam` | query boolean | Don't classify as spam |
-| `processForCalendar` | query boolean | Process calendar attachments |
-| `deleted` | query boolean | Mark as TRASH immediately |
+| Param                | Type          | Description                    |
+| -------------------- | ------------- | ------------------------------ |
+| `internalDateSource` | query string  | "receivedTime" or "dateHeader" |
+| `neverMarkSpam`      | query boolean | Don't classify as spam         |
+| `processForCalendar` | query boolean | Process calendar attachments   |
+| `deleted`            | query boolean | Mark as TRASH immediately      |
 
 **Request body:** Raw RFC 2822 message (base64url encoded).
 **Response:** Message object.
@@ -257,10 +259,10 @@ Similar to import but bypasses most scanning. Inserts directly into mailbox.
 
 **Parameters:**
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `internalDateSource` | query string | "receivedTime" or "dateHeader" |
-| `deleted` | query boolean | Mark as TRASH |
+| Param                | Type          | Description                    |
+| -------------------- | ------------- | ------------------------------ |
+| `internalDateSource` | query string  | "receivedTime" or "dateHeader" |
+| `deleted`            | query boolean | Mark as TRASH                  |
 
 **Request body:** Raw RFC 2822 message.
 **Response:** Message object.
@@ -271,11 +273,11 @@ Similar to import but bypasses most scanning. Inserts directly into mailbox.
 
 **Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `userId` | path string | Yes | Email or "me" |
-| `messageId` | path string | Yes | Parent message ID |
-| `id` | path string | Yes | Attachment ID (from MessagePartBody.attachmentId) |
+| Param       | Type        | Required | Description                                       |
+| ----------- | ----------- | -------- | ------------------------------------------------- |
+| `userId`    | path string | Yes      | Email or "me"                                     |
+| `messageId` | path string | Yes      | Parent message ID                                 |
+| `id`        | path string | Yes      | Attachment ID (from MessagePartBody.attachmentId) |
 
 **Response:**
 
@@ -322,12 +324,12 @@ Similar to import but bypasses most scanning. Inserts directly into mailbox.
 
 **Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `userId` | path string | Yes | Email or "me" |
-| `id` | path string | Yes | Thread ID |
-| `format` | query string | No | FULL, METADATA, MINIMAL (same as messages) |
-| `metadataHeaders` | query string[] | No | Headers for METADATA format |
+| Param             | Type           | Required | Description                                |
+| ----------------- | -------------- | -------- | ------------------------------------------ |
+| `userId`          | path string    | Yes      | Email or "me"                              |
+| `id`              | path string    | Yes      | Thread ID                                  |
+| `format`          | query string   | No       | FULL, METADATA, MINIMAL (same as messages) |
+| `metadataHeaders` | query string[] | No       | Headers for METADATA format                |
 
 **Response:**
 
@@ -409,10 +411,11 @@ Same pattern as messages — trash is reversible, delete is permanent.
 
 ```json
 {
-  "name": "string",                    // required; use "/" for nesting: "Finance/Banking"
-  "labelListVisibility": "string",     // optional
-  "messageListVisibility": "string",   // optional
-  "color": {                           // optional
+  "name": "string", // required; use "/" for nesting: "Finance/Banking"
+  "labelListVisibility": "string", // optional
+  "messageListVisibility": "string", // optional
+  "color": {
+    // optional
     "textColor": "string",
     "backgroundColor": "string"
   }
@@ -450,12 +453,12 @@ Same pattern as messages — trash is reversible, delete is permanent.
 
 **Parameters:**
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `maxResults` | query integer | Default 100, max 500 |
-| `pageToken` | query string | Pagination |
-| `q` | query string | Search query (searches draft content) |
-| `includeSpamTrash` | query boolean | Default false |
+| Param              | Type          | Description                           |
+| ------------------ | ------------- | ------------------------------------- |
+| `maxResults`       | query integer | Default 100, max 500                  |
+| `pageToken`        | query string  | Pagination                            |
+| `q`                | query string  | Search query (searches draft content) |
+| `includeSpamTrash` | query boolean | Default false                         |
 
 **Response:**
 
@@ -483,8 +486,8 @@ Same pattern as messages — trash is reversible, delete is permanent.
 
 **Parameters:**
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param    | Type         | Description                  |
+| -------- | ------------ | ---------------------------- |
 | `format` | query string | FULL, METADATA, MINIMAL, RAW |
 
 **Response:**
@@ -536,7 +539,7 @@ Same pattern as messages — trash is reversible, delete is permanent.
 
 ```json
 {
-  "id": "string"   // draft ID to send
+  "id": "string" // draft ID to send
 }
 ```
 
@@ -554,13 +557,13 @@ Same pattern as messages — trash is reversible, delete is permanent.
 
 **Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `startHistoryId` | query string | Yes | Return records after this ID |
-| `labelId` | query string | No | Filter to this label |
-| `maxResults` | query integer | No | Default 100 |
-| `pageToken` | query string | No | Pagination |
-| `historyTypes` | query string[] | No | Filter: "messageAdded", "messageDeleted", "labelAdded", "labelRemoved" |
+| Param            | Type           | Required | Description                                                            |
+| ---------------- | -------------- | -------- | ---------------------------------------------------------------------- |
+| `startHistoryId` | query string   | Yes      | Return records after this ID                                           |
+| `labelId`        | query string   | No       | Filter to this label                                                   |
+| `maxResults`     | query integer  | No       | Default 100                                                            |
+| `pageToken`      | query string   | No       | Pagination                                                             |
+| `historyTypes`   | query string[] | No       | Filter: "messageAdded", "messageDeleted", "labelAdded", "labelRemoved" |
 
 **Response:**
 
@@ -569,9 +572,7 @@ Same pattern as messages — trash is reversible, delete is permanent.
   "history": [
     {
       "id": "string",
-      "messages": [
-        { "id": "string", "threadId": "string" }
-      ],
+      "messages": [{ "id": "string", "threadId": "string" }],
       "messagesAdded": [
         {
           "message": { "id": "string", "threadId": "string", "labelIds": ["string"] }
@@ -851,13 +852,13 @@ Same pattern as messages — trash is reversible, delete is permanent.
 
 Gmail supports Google's standard batch endpoint for combining multiple API calls into one HTTP request.
 
-| Property | Value |
-|----------|-------|
-| Max calls per batch | 100 |
-| Quota savings | NONE — each inner call costs its normal quota |
-| Benefit | Reduces HTTP connection overhead (latency savings) |
-| Format | multipart/mixed with individual HTTP request parts |
-| Constraint | All inner requests must target the same API |
+| Property            | Value                                              |
+| ------------------- | -------------------------------------------------- |
+| Max calls per batch | 100                                                |
+| Quota savings       | NONE — each inner call costs its normal quota      |
+| Benefit             | Reduces HTTP connection overhead (latency savings) |
+| Format              | multipart/mixed with individual HTTP request parts |
+| Constraint          | All inner requests must target the same API        |
 
 **Use case for MCP server:** When an aggregated read needs to call `messages.get` on 25 messages, batch them into a single HTTP request instead of 25 separate connections. Same quota cost, much lower latency.
 
@@ -869,12 +870,12 @@ The `fields` parameter reduces response size by requesting only specific fields.
 
 **Syntax:**
 
-| Pattern | Example | Meaning |
-|---------|---------|---------|
-| Top-level | `fields=id,snippet` | Only return id and snippet |
-| Nested | `fields=payload/headers` | Only return headers from payload |
-| Sub-select | `fields=messages(id,snippet)` | For array items, only return id and snippet |
-| Deep nested | `fields=payload/headers,payload/parts(mimeType,filename)` | Combine nested selections |
+| Pattern     | Example                                                   | Meaning                                     |
+| ----------- | --------------------------------------------------------- | ------------------------------------------- |
+| Top-level   | `fields=id,snippet`                                       | Only return id and snippet                  |
+| Nested      | `fields=payload/headers`                                  | Only return headers from payload            |
+| Sub-select  | `fields=messages(id,snippet)`                             | For array items, only return id and snippet |
+| Deep nested | `fields=payload/headers,payload/parts(mimeType,filename)` | Combine nested selections                   |
 
 **Use case for MCP server:** When fetching messages for a summary, request only the fields you'll include in the aggregated response. Cuts bandwidth and parse time significantly.
 
@@ -886,19 +887,20 @@ The `fields` parameter reduces response size by requesting only specific fields.
 
 The Gmail API is designed around resource-level CRUD, not task-level operations. Every useful "view" of the inbox requires multiple API calls:
 
-| User Intent | API Calls Required |
-|------------|-------------------|
-| "Show me my inbox" | messages.list (IDs only) → N × messages.get → labels.list (resolve names) |
-| "What labels do I have and how full are they?" | labels.list → N × labels.get (for counts) |
-| "Show me this conversation" | threads.get (one call, but returns raw label IDs) → labels.list (resolve) |
-| "What filters do I have?" | filters.list (returns label IDs in actions) → labels.list (resolve) |
-| "What changed since yesterday?" | history.list → messages.get for each changed message → labels.list |
+| User Intent                                    | API Calls Required                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------- |
+| "Show me my inbox"                             | messages.list (IDs only) → N × messages.get → labels.list (resolve names) |
+| "What labels do I have and how full are they?" | labels.list → N × labels.get (for counts)                                 |
+| "Show me this conversation"                    | threads.get (one call, but returns raw label IDs) → labels.list (resolve) |
+| "What filters do I have?"                      | filters.list (returns label IDs in actions) → labels.list (resolve)       |
+| "What changed since yesterday?"                | history.list → messages.get for each changed message → labels.list        |
 
 ### Natural Aggregation Boundaries
 
 Based on the API shapes above, here are the natural read-aggregation boundaries:
 
 **Boundary 1: Message List + Detail + Label Resolution**
+
 - `messages.list` returns only IDs
 - `messages.get` with format=METADATA returns headers + labels cheaply
 - `labels.list` is needed to resolve label IDs → names
@@ -907,40 +909,44 @@ Based on the API shapes above, here are the natural read-aggregation boundaries:
 - Use `fields` parameter to reduce payload size
 
 **Boundary 2: Thread + Full Content + Label Resolution**
+
 - `threads.get` already returns all messages — this is semi-aggregated
 - But label IDs still need resolution via `labels.list`
 - Attachment metadata is in the response but actual content needs `attachments.get`
 
 **Boundary 3: Labels + Counts**
+
 - `labels.list` returns names and types
 - Individual `labels.get` returns counts (messages, unread, threads)
 - These should be combined into one view
 
 **Boundary 4: Settings + Filters + Labels**
+
 - `filters.list` returns label IDs in actions
 - `labels.list` needed to resolve filter action label names
 - All settings endpoints (autoforwarding, imap, pop, vacation, sendAs, delegates, forwarding) are small, independent, cheap calls
 - Could be combined into a single "account settings overview"
 
 **Boundary 5: History + Message Details + Labels**
+
 - `history.list` returns change records with message IDs
 - Enriching these with `messages.get` (at least METADATA format) makes them useful
 - `labels.list` for resolution
 
 ### What This Means for `format` Parameter Strategy
 
-| Aggregated Read Purpose | Best `format` | Why |
-|------------------------|---------------|-----|
-| Inbox summary / triage | METADATA + metadataHeaders=[From, To, Subject, Date] | Headers + labels without body = fast + cheap |
-| Read specific email | FULL | Need body content |
-| Bulk categorization | MINIMAL | Only need labels + IDs for batch operations |
-| Export / backup | RAW | Complete RFC 2822 for archival |
+| Aggregated Read Purpose | Best `format`                                        | Why                                          |
+| ----------------------- | ---------------------------------------------------- | -------------------------------------------- |
+| Inbox summary / triage  | METADATA + metadataHeaders=[From, To, Subject, Date] | Headers + labels without body = fast + cheap |
+| Read specific email     | FULL                                                 | Need body content                            |
+| Bulk categorization     | MINIMAL                                              | Only need labels + IDs for batch operations  |
+| Export / backup         | RAW                                                  | Complete RFC 2822 for archival               |
 
 ### Endpoints That Don't Need Aggregation (Already Complete)
 
-| Endpoint | Why It Stands Alone |
-|----------|-------------------|
+| Endpoint                                     | Why It Stands Alone                      |
+| -------------------------------------------- | ---------------------------------------- |
 | `messages.get` (format=FULL, single message) | Already returns everything for one email |
-| `threads.get` (format=FULL) | Already returns full conversation |
-| `profile.getProfile` | Tiny, complete response |
-| Individual settings (vacation, IMAP, etc.) | Small, self-contained |
+| `threads.get` (format=FULL)                  | Already returns full conversation        |
+| `profile.getProfile`                         | Tiny, complete response                  |
+| Individual settings (vacation, IMAP, etc.)   | Small, self-contained                    |
