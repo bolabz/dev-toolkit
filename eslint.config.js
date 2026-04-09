@@ -61,6 +61,7 @@ export default tseslint.config(
       'no-param-reassign': ['error', { props: false }],
       'no-return-assign': 'error',
       curly: ['error', 'all'],
+      'max-lines': ['error', { max: 400, skipBlankLines: true, skipComments: true }],
 
       // --- Safety ---
       '@typescript-eslint/no-shadow': 'error',
@@ -89,14 +90,6 @@ export default tseslint.config(
     files: ['src/logger.ts'],
     rules: {
       'no-console': ['error', { allow: ['error'] }],
-    },
-  },
-  // MCP server uses deprecated SDK methods (tool/resource/prompt → registerTool/registerResource/registerPrompt)
-  // TODO: Migrate to new MCP SDK API and remove this override
-  {
-    files: ['src/mcp-server.ts'],
-    rules: {
-      '@typescript-eslint/no-deprecated': 'off',
     },
   },
   // JSDoc enforcement for TypeScript files

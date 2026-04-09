@@ -1,46 +1,21 @@
 /**
- * Gmail Toolkit — Read Message / Read Thread Composed Operations
+ * Gmail Toolkit — Thread Composed Operations
+ *
+ * All thread-level operations: read, modify, trash.
  */
 
-import type { gmail_v1 } from 'googleapis';
 import type { GmailClient } from '../client/index.js';
 import type { LabelCache } from './labels.js';
-import { processMessagePayload } from './body-processing.js';
 import {
-  parseContact,
-  parseContactList,
   deduplicateContacts,
-  gmailWebUrl,
-  headerMap,
-  parseDate,
   isUserLabel,
+  formatLabelChanges,
+  transformMessage,
 } from './helpers.js';
-import type { FullMessage, FullThread, Contact, AttachmentInfo } from '../types.js';
+import type { FullMessage, FullThread, Contact, ModifyResult } from '../types.js';
 import { logger } from '../logger.js';
 
-const log = logger.child('composed:readers');
-
-// ---------------------------------------------------------------------------
-// Read Single Message
-// ---------------------------------------------------------------------------
-
-/**
- * Read a single message with full headers, body, and metadata.
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
- * @param messageId - The Gmail message ID to read
- * @param includeHtml - Whether to include raw HTML alongside plain text
- * @returns The fully resolved message with parsed contacts and labels
- */
-export async function readMessage(
-  client: GmailClient,
-  labelCache: LabelCache,
-  messageId: string,
-  includeHtml = false,
-): Promise<FullMessage> {
-  const raw = await client.messages.get(messageId, 'full');
-  return transformMessage(raw, labelCache, { stripReplies: true, includeHtml });
-}
+const log = logger.child('composed:threads');
 
 // ---------------------------------------------------------------------------
 // Read Thread
@@ -135,67 +110,57 @@ export async function readThread(
 }
 
 // ---------------------------------------------------------------------------
-// Shared Message Transformer
+// Modify Thread
 // ---------------------------------------------------------------------------
 
-async function transformMessage(
-  raw: gmail_v1.Schema$Message,
+/**
+ * Modify labels on an entire thread.
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @param threadId - The thread ID to modify
+ * @param addLabels - Label names to apply to the thread
+ * @param removeLabels - Label names to remove from the thread
+ * @returns A summary of the thread modification
+ */
+export async function modifyThread(
+  client: GmailClient,
   labelCache: LabelCache,
-  options: { stripReplies: boolean; includeHtml: boolean },
-): Promise<FullMessage> {
-  const headers = headerMap(raw.payload?.headers ?? []);
-  const labelIds = raw.labelIds ?? [];
-  const resolvedLabels = await labelCache.resolve(labelIds);
+  threadId: string,
+  addLabels: string[] = [],
+  removeLabels: string[] = [],
+): Promise<ModifyResult> {
+  const addLabelIds = addLabels.length > 0 ? await labelCache.lookupMany(addLabels) : [];
+  const removeLabelIds = removeLabels.length > 0 ? await labelCache.lookupMany(removeLabels) : [];
 
-  // Process body through pipeline
-  const { text, html } = await processMessagePayload(
-    raw.payload ?? {},
-    raw.payload?.mimeType ?? undefined,
-    options,
-  );
-
-  return {
-    id: raw.id ?? '',
-    thread_id: raw.threadId ?? '',
-    from: parseContact(headers.get('From') ?? ''),
-    to: parseContactList(headers.get('To') ?? ''),
-    cc: parseContactList(headers.get('Cc') ?? ''),
-    bcc: parseContactList(headers.get('Bcc') ?? ''),
-    subject: headers.get('Subject') ?? '(no subject)',
-    date: parseDate(headers.get('Date') ?? ''),
-    labels: resolvedLabels,
-    is_unread: labelIds.includes('UNREAD'),
-    is_starred: labelIds.includes('STARRED'),
-    body_text: text,
-    body_html: html,
-    attachments: extractAttachments(raw.payload),
-    size_bytes: raw.sizeEstimate ?? 0,
-    web_url: gmailWebUrl(raw.id ?? ''),
-  };
+  try {
+    await client.threads.modify(threadId, addLabelIds, removeLabelIds);
+    return {
+      modified: 1,
+      failed: [],
+      message: `Modified thread.${formatLabelChanges(addLabels, removeLabels)}`,
+    };
+  } catch (err) {
+    log.debug(`Failed to modify thread ${threadId}`, err);
+    return { modified: 0, failed: [threadId], message: `Failed to modify thread ${threadId}.` };
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Trash Thread
 // ---------------------------------------------------------------------------
 
-function extractAttachments(payload: gmail_v1.Schema$MessagePart | undefined): AttachmentInfo[] {
-  const attachments: AttachmentInfo[] = [];
-  if (!payload) return attachments;
-
-  function walk(part: gmail_v1.Schema$MessagePart) {
-    if (part.filename != null && part.filename.length > 0) {
-      attachments.push({
-        id: part.body?.attachmentId ?? '',
-        filename: part.filename,
-        mime_type: part.mimeType ?? 'application/octet-stream',
-        size_bytes: part.body?.size ?? 0,
-      });
-    }
-    for (const child of part.parts ?? []) {
-      walk(child);
-    }
+/**
+ * Move an entire thread to the trash (recoverable for 30 days).
+ * @param client - The authenticated Gmail API client
+ * @param threadId - The Gmail thread ID to trash
+ * @returns A summary of the operation
+ */
+export async function trashThread(client: GmailClient, threadId: string): Promise<ModifyResult> {
+  try {
+    await client.threads.trash(threadId);
+    return { modified: 1, failed: [], message: 'Thread moved to Trash. Recoverable for 30 days.' };
+  } catch (err) {
+    log.debug(`Failed to trash thread ${threadId}`, err);
+    return { modified: 0, failed: [threadId], message: `Failed to trash thread ${threadId}.` };
   }
-
-  walk(payload);
-  return attachments;
 }

@@ -7,7 +7,7 @@
 
 import type { gmail_v1 } from 'googleapis';
 import type { GmailClient } from '../client/index.js';
-import type { LabelDetail, LabelOverview } from '../types.js';
+import type { LabelDetail, LabelOverview, DeleteLabelResult } from '../types.js';
 import { GmailValidationError } from '../errors.js';
 import { logger } from '../logger.js';
 
@@ -250,4 +250,61 @@ export async function updateLabel(
   labelCache.invalidate();
 
   return toDetail(updated);
+}
+
+// ---------------------------------------------------------------------------
+// Delete
+// ---------------------------------------------------------------------------
+
+/**
+ * Permanently delete a Gmail label. Messages are not deleted, only unlabeled.
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @param nameOrId - The label name or ID to delete
+ * @returns The deletion result with affected message and thread counts
+ */
+export async function deleteLabel(
+  client: GmailClient,
+  labelCache: LabelCache,
+  nameOrId: string,
+): Promise<DeleteLabelResult> {
+  const id = (await labelCache.lookup(nameOrId)) ?? nameOrId;
+
+  // Fetch label details BEFORE deleting so we can report what was affected
+  let labelName = nameOrId;
+  let messagesAffected = 0;
+  let threadsAffected = 0;
+  try {
+    const detail = await client.labels.get(id);
+    labelName = detail.name ?? nameOrId;
+    messagesAffected = detail.messagesTotal ?? 0;
+    threadsAffected = detail.threadsTotal ?? 0;
+  } catch (err) {
+    log.debug(`Could not fetch label details for "${id}" before delete (proceeding anyway)`, err);
+  }
+
+  try {
+    await client.labels.delete(id);
+    labelCache.invalidate();
+    return {
+      deleted: true,
+      label_name: labelName,
+      label_id: id,
+      messages_affected: messagesAffected,
+      threads_affected: threadsAffected,
+      message:
+        messagesAffected > 0
+          ? `Deleted label "${labelName}". ${messagesAffected} messages (${threadsAffected} threads) are no longer labeled — the messages themselves were NOT deleted.`
+          : `Deleted empty label "${labelName}".`,
+    };
+  } catch (err) {
+    return {
+      deleted: false,
+      label_name: labelName,
+      label_id: id,
+      messages_affected: 0,
+      threads_affected: 0,
+      message: `Failed to delete label "${labelName}": ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 }

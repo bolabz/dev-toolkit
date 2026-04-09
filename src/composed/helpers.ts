@@ -6,7 +6,9 @@
  */
 
 import type { gmail_v1 } from 'googleapis';
-import type { Contact } from '../types.js';
+import type { Contact, FullMessage, AttachmentInfo } from '../types.js';
+import type { LabelCache } from './labels.js';
+import { processMessagePayload } from './body-processing.js';
 import { logger } from '../logger.js';
 
 const log = logger.child('composed:helpers');
@@ -267,4 +269,91 @@ export function buildRfc2822Message(options: {
  */
 export function formatLabelChanges(addLabels: string[], removeLabels: string[]): string {
   return `${addLabels.length > 0 ? ` Added: ${addLabels.join(', ')}.` : ''}${removeLabels.length > 0 ? ` Removed: ${removeLabels.join(', ')}.` : ''}`;
+}
+
+// ---------------------------------------------------------------------------
+// Message Transformation
+// ---------------------------------------------------------------------------
+
+/**
+ * Transform a raw Gmail API message into a fully resolved FullMessage.
+ * Resolves label IDs to names, processes body through the text pipeline,
+ * and extracts attachment metadata.
+ * @param raw - The raw Gmail API message object
+ * @param labelCache - The label cache for resolving label IDs to names
+ * @param options - Processing options for body text extraction
+ * @param options.stripReplies - Whether to strip quoted reply chains from body text
+ * @param options.includeHtml - Whether to include raw HTML alongside plain text
+ * @returns A fully resolved message with parsed contacts, labels, and body
+ */
+export async function transformMessage(
+  raw: gmail_v1.Schema$Message,
+  labelCache: LabelCache,
+  options: { stripReplies: boolean; includeHtml: boolean },
+): Promise<FullMessage> {
+  const headers = headerMap(raw.payload?.headers ?? []);
+  const labelIds = raw.labelIds ?? [];
+  const resolvedLabels = await labelCache.resolve(labelIds);
+
+  // Process body through pipeline
+  const { text, html } = await processMessagePayload(
+    raw.payload ?? {},
+    raw.payload?.mimeType ?? undefined,
+    options,
+  );
+
+  return {
+    id: raw.id ?? '',
+    thread_id: raw.threadId ?? '',
+    from: parseContact(headers.get('From') ?? ''),
+    to: parseContactList(headers.get('To') ?? ''),
+    cc: parseContactList(headers.get('Cc') ?? ''),
+    bcc: parseContactList(headers.get('Bcc') ?? ''),
+    subject: headers.get('Subject') ?? '(no subject)',
+    date: parseDate(headers.get('Date') ?? ''),
+    labels: resolvedLabels,
+    is_unread: labelIds.includes('UNREAD'),
+    is_starred: labelIds.includes('STARRED'),
+    body_text: text,
+    body_html: html,
+    attachments: extractAttachments(raw.payload),
+    size_bytes: raw.sizeEstimate ?? 0,
+    web_url: gmailWebUrl(raw.id ?? ''),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Attachment Extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract attachment metadata from a Gmail message payload.
+ * Recursively walks the MIME tree to find parts with filenames.
+ * @param payload - The Gmail message payload to inspect for attachments
+ * @returns An array of attachment metadata (id, filename, MIME type, size)
+ */
+export function extractAttachments(
+  payload: gmail_v1.Schema$MessagePart | undefined,
+): AttachmentInfo[] {
+  const attachments: AttachmentInfo[] = [];
+  if (!payload) {
+    return attachments;
+  }
+
+  function walk(part: gmail_v1.Schema$MessagePart) {
+    if (part.filename != null && part.filename.length > 0) {
+      attachments.push({
+        id: part.body?.attachmentId ?? '',
+        filename: part.filename,
+        mime_type: part.mimeType ?? 'application/octet-stream',
+        size_bytes: part.body?.size ?? 0,
+      });
+    }
+    for (const child of part.parts ?? []) {
+      walk(child);
+    }
+  }
+
+  walk(payload);
+  return attachments;
 }

@@ -12,7 +12,7 @@ import {
   buildRfc2822Message,
 } from './helpers.js';
 import { processMessagePayload } from './body-processing.js';
-import type { DraftSummary, DraftDetail } from '../types.js';
+import type { DraftSummary, DraftDetail, DeleteResult, SendResult } from '../types.js';
 import he from 'he';
 
 /**
@@ -116,5 +116,46 @@ export async function createDraft(
     date: new Date().toISOString(),
     size_bytes: msg?.sizeEstimate ?? 0,
     has_attachments: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Delete
+// ---------------------------------------------------------------------------
+
+/**
+ * Permanently delete a draft message.
+ * @param client - The authenticated Gmail API client
+ * @param draftId - The draft ID to delete
+ * @returns The deletion result indicating success or failure
+ */
+export async function deleteDraft(client: GmailClient, draftId: string): Promise<DeleteResult> {
+  try {
+    await client.drafts.delete(draftId);
+    return { deleted: true, message: `Draft ${draftId} permanently deleted.` };
+  } catch (err) {
+    return {
+      deleted: false,
+      message: `Failed to delete draft: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Send
+// ---------------------------------------------------------------------------
+
+/**
+ * Send a previously created draft.
+ * @param client - The authenticated Gmail API client
+ * @param draftId - The draft ID to send
+ * @returns The send result with the new message and thread IDs
+ */
+export async function sendDraft(client: GmailClient, draftId: string): Promise<SendResult> {
+  const result = await client.drafts.send(draftId);
+  return {
+    message_id: result.id ?? '',
+    thread_id: result.threadId ?? null,
+    message: `Draft sent successfully. Message ID: ${result.id ?? 'unknown'}.`,
   };
 }
