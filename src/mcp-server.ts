@@ -84,20 +84,30 @@ function toMcpError(
   err: unknown,
   toolName: string,
 ): { content: Array<{ type: 'text'; text: string }>; isError: true } {
-  const errorDto: GmailToolkitError = {
-    code: err instanceof GmailApiError ? err.code : 0,
-    message: err instanceof Error ? err.message : String(err),
-    operation:
-      err instanceof GmailApiError
-        ? err.operation
-        : err instanceof GmailValidationError
-          ? err.operation
-          : toolName,
-    retryable: err instanceof GmailApiError ? err.retryable : false,
-    ...(err instanceof GmailValidationError && err.field !== undefined && err.field !== ''
-      ? { field: err.field }
-      : {}),
-  };
+  let errorDto: GmailToolkitError;
+  if (err instanceof GmailApiError) {
+    errorDto = {
+      code: err.code,
+      message: err.message,
+      operation: err.operation,
+      retryable: err.retryable,
+    };
+  } else if (err instanceof GmailValidationError) {
+    errorDto = {
+      code: 0,
+      message: err.message,
+      operation: err.operation,
+      retryable: false,
+      ...(err.field !== undefined && err.field !== '' ? { field: err.field } : {}),
+    };
+  } else {
+    errorDto = {
+      code: 0,
+      message: err instanceof Error ? err.message : String(err),
+      operation: toolName,
+      retryable: false,
+    };
+  }
   log.error(`Tool error [${toolName}]: ${errorDto.message}`);
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(errorDto, null, 2) }],

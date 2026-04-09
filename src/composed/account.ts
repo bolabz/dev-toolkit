@@ -10,6 +10,9 @@ import { logger } from '../logger.js';
 
 const log = logger.child('composed:account');
 
+const msToIso = (ms: string | null | undefined): string | null =>
+  ms != null ? new Date(Number(ms)).toISOString() : null;
+
 /**
  * Get account information including profile, vacation, and forwarding settings.
  * @param client - The authenticated Gmail API client
@@ -40,8 +43,8 @@ export async function getAccount(client: GmailClient): Promise<AccountOverview> 
     vacation: {
       enabled: vacation.enableAutoReply ?? false,
       subject: vacation.responseSubject ?? null,
-      start: vacation.startTime != null ? new Date(Number(vacation.startTime)).toISOString() : null,
-      end: vacation.endTime != null ? new Date(Number(vacation.endTime)).toISOString() : null,
+      start: msToIso(vacation.startTime),
+      end: msToIso(vacation.endTime),
       restrict_to_contacts: vacation.restrictToContacts ?? false,
     },
     forwarding: {

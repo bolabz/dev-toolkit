@@ -2,9 +2,41 @@
  * Gmail Toolkit — Filter Composed Operations
  */
 
+import type { gmail_v1 } from 'googleapis';
 import type { GmailClient } from '../client/index.js';
 import type { LabelCache } from './labels.js';
 import type { FilterOverview, FilterDetail } from '../types.js';
+
+// ---------------------------------------------------------------------------
+// Shared Helper
+// ---------------------------------------------------------------------------
+
+function toFilterDetail(
+  raw: gmail_v1.Schema$Filter,
+  resolvedAddLabels: string[],
+  resolvedRemoveLabels: string[],
+): FilterDetail {
+  return {
+    id: raw.id ?? '',
+    criteria: {
+      from: raw.criteria?.from ?? null,
+      to: raw.criteria?.to ?? null,
+      subject: raw.criteria?.subject ?? null,
+      query: raw.criteria?.query ?? null,
+      negated_query: raw.criteria?.negatedQuery ?? null,
+      has_attachment: raw.criteria?.hasAttachment ?? null,
+      size: raw.criteria?.size ?? null,
+      size_comparison: (raw.criteria?.sizeComparison as 'smaller' | 'larger' | undefined) ?? null,
+    },
+    actions: {
+      add_labels: resolvedAddLabels,
+      remove_labels: resolvedRemoveLabels,
+      forward_to: raw.action?.forward ?? null,
+      skip_inbox: (raw.action?.removeLabelIds ?? []).includes('INBOX'),
+      mark_read: (raw.action?.removeLabelIds ?? []).includes('UNREAD'),
+    },
+  };
+}
 
 /**
  * Retrieve all Gmail filters with resolved label names.
@@ -23,29 +55,12 @@ export async function getFilters(
     const addLabelIds = raw.action?.addLabelIds ?? [];
     const removeLabelIds = raw.action?.removeLabelIds ?? [];
 
-    const addLabels = await labelCache.resolve(addLabelIds);
-    const removeLabels = await labelCache.resolve(removeLabelIds);
+    const [addLabels, removeLabels] = await Promise.all([
+      labelCache.resolve(addLabelIds),
+      labelCache.resolve(removeLabelIds),
+    ]);
 
-    filters.push({
-      id: raw.id ?? '',
-      criteria: {
-        from: raw.criteria?.from ?? null,
-        to: raw.criteria?.to ?? null,
-        subject: raw.criteria?.subject ?? null,
-        query: raw.criteria?.query ?? null,
-        negated_query: raw.criteria?.negatedQuery ?? null,
-        has_attachment: raw.criteria?.hasAttachment ?? null,
-        size: raw.criteria?.size ?? null,
-        size_comparison: (raw.criteria?.sizeComparison as 'smaller' | 'larger' | undefined) ?? null,
-      },
-      actions: {
-        add_labels: addLabels,
-        remove_labels: removeLabels,
-        forward_to: raw.action?.forward ?? null,
-        skip_inbox: removeLabelIds.includes('INBOX'),
-        mark_read: removeLabelIds.includes('UNREAD'),
-      },
-    });
+    filters.push(toFilterDetail(raw, addLabels, removeLabels));
   }
 
   return { total: filters.length, filters };
@@ -95,17 +110,16 @@ export async function createFilter(
 ): Promise<FilterDetail> {
   // Resolve label names to IDs
   const addLabelIds = actions.add_labels ? await labelCache.lookupMany(actions.add_labels) : [];
-  const removeLabelIds = actions.remove_labels
+  const baseLabelIds = actions.remove_labels
     ? await labelCache.lookupMany(actions.remove_labels)
     : [];
 
-  // Handle skip_inbox and mark_read as label removals
-  if (actions.skip_inbox === true && !removeLabelIds.includes('INBOX')) {
-    removeLabelIds.push('INBOX');
-  }
-  if (actions.mark_read === true && !removeLabelIds.includes('UNREAD')) {
-    removeLabelIds.push('UNREAD');
-  }
+  // Handle skip_inbox and mark_read as label removals (immutable)
+  const removeLabelIds = [
+    ...baseLabelIds,
+    ...(actions.skip_inbox === true && !baseLabelIds.includes('INBOX') ? ['INBOX'] : []),
+    ...(actions.mark_read === true && !baseLabelIds.includes('UNREAD') ? ['UNREAD'] : []),
+  ];
 
   const raw = await client.filters.create(
     {
@@ -128,24 +142,5 @@ export async function createFilter(
   const resolvedAdd = await labelCache.resolve(raw.action?.addLabelIds ?? []);
   const resolvedRemove = await labelCache.resolve(raw.action?.removeLabelIds ?? []);
 
-  return {
-    id: raw.id ?? '',
-    criteria: {
-      from: raw.criteria?.from ?? null,
-      to: raw.criteria?.to ?? null,
-      subject: raw.criteria?.subject ?? null,
-      query: raw.criteria?.query ?? null,
-      negated_query: raw.criteria?.negatedQuery ?? null,
-      has_attachment: raw.criteria?.hasAttachment ?? null,
-      size: raw.criteria?.size ?? null,
-      size_comparison: (raw.criteria?.sizeComparison as 'smaller' | 'larger' | undefined) ?? null,
-    },
-    actions: {
-      add_labels: resolvedAdd,
-      remove_labels: resolvedRemove,
-      forward_to: raw.action?.forward ?? null,
-      skip_inbox: (raw.action?.removeLabelIds ?? []).includes('INBOX'),
-      mark_read: (raw.action?.removeLabelIds ?? []).includes('UNREAD'),
-    },
-  };
+  return toFilterDetail(raw, resolvedAdd, resolvedRemove);
 }

@@ -90,14 +90,15 @@ export function gmailWebUrl(messageId: string): string {
  * @returns Deduplicated contacts preserving the first occurrence of each email
  */
 export function deduplicateContacts(contacts: Contact[]): Contact[] {
-  const seen = new Map<string, Contact>();
-  for (const contact of contacts) {
-    const key = contact.email.toLowerCase();
-    if (!seen.has(key)) {
-      seen.set(key, contact);
+  const seen = new Set<string>();
+  return contacts.filter((c) => {
+    const key = c.email.toLowerCase();
+    const isNew = !seen.has(key);
+    if (isNew) {
+      seen.add(key);
     }
-  }
-  return Array.from(seen.values());
+    return isNew;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -110,13 +111,11 @@ export function deduplicateContacts(contacts: Contact[]): Contact[] {
  * @returns A Map keyed by header name for fast lookup
  */
 export function headerMap(headers: gmail_v1.Schema$MessagePartHeader[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const h of headers) {
-    if (h.name != null && h.value != null) {
-      map.set(h.name, h.value);
-    }
-  }
-  return map;
+  return new Map(
+    headers
+      .filter((h): h is { name: string; value: string } => h.name != null && h.value != null)
+      .map((h) => [h.name, h.value] as const),
+  );
 }
 
 /**
@@ -210,4 +209,62 @@ export function hasAttachments(
  */
 export function isUserLabel(labelId: string): boolean {
   return /^Label_\d+$/.test(labelId);
+}
+
+// ---------------------------------------------------------------------------
+// RFC 2822 Message Building
+// ---------------------------------------------------------------------------
+
+/**
+ * Build an RFC 2822 compliant email message string from structured options.
+ * Shared by draft creation and direct message sending.
+ * @param options - The message composition options
+ * @param options.to - Recipient email address
+ * @param options.cc - CC recipient email addresses
+ * @param options.bcc - BCC recipient email addresses
+ * @param options.subject - The email subject line
+ * @param options.body - The email body content
+ * @param options.contentType - MIME content type (defaults to 'text/plain')
+ * @returns The RFC 2822 formatted message string
+ */
+export function buildRfc2822Message(options: {
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  body: string;
+  contentType?: string;
+}): string {
+  const lines: string[] = [];
+  if (options.to != null) {
+    lines.push(`To: ${options.to}`);
+  }
+  if (options.cc != null) {
+    lines.push(`Cc: ${options.cc}`);
+  }
+  if (options.bcc != null) {
+    lines.push(`Bcc: ${options.bcc}`);
+  }
+  if (options.subject != null) {
+    lines.push(`Subject: ${options.subject}`);
+  }
+  lines.push(`Content-Type: ${options.contentType ?? 'text/plain'}; charset=utf-8`);
+  lines.push('');
+  lines.push(options.body);
+  return lines.join('\r\n');
+}
+
+// ---------------------------------------------------------------------------
+// Label Change Formatting
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a human-readable summary of label additions and removals.
+ * Used by message and thread modification operations.
+ * @param addLabels - Label names that were added
+ * @param removeLabels - Label names that were removed
+ * @returns A formatted string summarizing the label changes
+ */
+export function formatLabelChanges(addLabels: string[], removeLabels: string[]): string {
+  return `${addLabels.length > 0 ? ` Added: ${addLabels.join(', ')}.` : ''}${removeLabels.length > 0 ? ` Removed: ${removeLabels.join(', ')}.` : ''}`;
 }

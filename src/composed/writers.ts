@@ -6,6 +6,7 @@
 
 import type { GmailClient } from '../client/index.js';
 import type { LabelCache } from './labels.js';
+import { formatLabelChanges } from './helpers.js';
 import type { ModifyResult } from '../types.js';
 import { logger } from '../logger.js';
 
@@ -61,7 +62,7 @@ export async function modifyMessages(
     failed,
     message:
       failed.length === 0
-        ? `Successfully modified ${messageIds.length} message(s).${addLabels.length > 0 ? ` Added: ${addLabels.join(', ')}.` : ''}${removeLabels.length > 0 ? ` Removed: ${removeLabels.join(', ')}.` : ''}`
+        ? `Successfully modified ${messageIds.length} message(s).${formatLabelChanges(addLabels, removeLabels)}`
         : `Modified ${messageIds.length - failed.length} of ${messageIds.length} messages. ${failed.length} failed.`,
   };
 }
@@ -90,7 +91,7 @@ export async function modifyThread(
     return {
       modified: 1,
       failed: [],
-      message: `Modified thread.${addLabels.length > 0 ? ` Added: ${addLabels.join(', ')}.` : ''}${removeLabels.length > 0 ? ` Removed: ${removeLabels.join(', ')}.` : ''}`,
+      message: `Modified thread.${formatLabelChanges(addLabels, removeLabels)}`,
     };
   } catch (err) {
     log.debug(`Failed to modify thread ${threadId}`, err);

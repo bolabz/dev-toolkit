@@ -249,10 +249,7 @@ async function stripReplyChain(text: string): Promise<string> {
 function trimStandardSignature(text: string): string {
   // RFC 3676 standard signature delimiter
   const sigDelimiterIndex = text.indexOf('\n-- \n');
-  let result = text;
-  if (sigDelimiterIndex !== -1) {
-    result = result.substring(0, sigDelimiterIndex);
-  }
+  const base = sigDelimiterIndex !== -1 ? text.substring(0, sigDelimiterIndex) : text;
 
   // Common mobile / app signatures
   const mobilePatterns = [
@@ -262,11 +259,7 @@ function trimStandardSignature(text: string): string {
     /\n?Sent from Yahoo Mail[^\n]*$/i,
   ];
 
-  for (const pattern of mobilePatterns) {
-    result = result.replace(pattern, '');
-  }
-
-  return result;
+  return mobilePatterns.reduce((acc, pattern) => acc.replace(pattern, ''), base);
 }
 
 /**

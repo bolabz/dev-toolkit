@@ -5,6 +5,7 @@
  * label IDs to human-readable names without repeated API calls.
  */
 
+import type { gmail_v1 } from 'googleapis';
 import type { GmailClient } from '../client/index.js';
 import type { LabelDetail, LabelOverview } from '../types.js';
 import { GmailValidationError } from '../errors.js';
@@ -102,6 +103,27 @@ export class LabelCache {
 }
 
 // ---------------------------------------------------------------------------
+// Shared Label Transformer
+// ---------------------------------------------------------------------------
+
+function toDetail(label: gmail_v1.Schema$Label, detailed?: gmail_v1.Schema$Label): LabelDetail {
+  const source = detailed ?? label;
+  return {
+    id: source.id ?? '',
+    name: source.name ?? '',
+    type: source.type === 'user' ? 'user' : 'system',
+    messages_total: source.messagesTotal ?? 0,
+    messages_unread: source.messagesUnread ?? 0,
+    threads_total: source.threadsTotal ?? 0,
+    threads_unread: source.threadsUnread ?? 0,
+    color: source.color
+      ? { text: source.color.textColor ?? '', background: source.color.backgroundColor ?? '' }
+      : null,
+    visibility: source.labelListVisibility ?? 'labelShow',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Composed Label Operations
 // ---------------------------------------------------------------------------
 
@@ -119,46 +141,29 @@ export async function getLabels(
   const allLabels = await client.labels.list();
 
   // Classify labels
-  const systemLabels: typeof allLabels = [];
-  const userLabels: typeof allLabels = [];
-  const categories: typeof allLabels = [];
-
-  for (const label of allLabels) {
-    const name = label.name ?? '';
-    if (name.startsWith('CATEGORY_')) {
-      categories.push(label);
-    } else if (label.type === 'user') {
-      userLabels.push(label);
-    } else {
-      systemLabels.push(label);
-    }
-  }
+  const { systemLabels, userLabels, categories } = allLabels.reduce<{
+    systemLabels: typeof allLabels;
+    userLabels: typeof allLabels;
+    categories: typeof allLabels;
+  }>(
+    (acc, label) => {
+      const name = label.name ?? '';
+      if (name.startsWith('CATEGORY_')) {
+        acc.categories.push(label);
+      } else if (label.type === 'user') {
+        acc.userLabels.push(label);
+      } else {
+        acc.systemLabels.push(label);
+      }
+      return acc;
+    },
+    { systemLabels: [], userLabels: [], categories: [] },
+  );
 
   // Fetch accurate counts for user labels only (batched)
   const userLabelIds = userLabels.map((l) => l.id ?? '').filter((id) => id !== '');
   const detailedUserLabels =
     userLabelIds.length > 0 ? await client.labels.batchGet(userLabelIds) : [];
-
-  // Build response
-  const toDetail = (
-    label: (typeof allLabels)[0],
-    detailed?: (typeof allLabels)[0],
-  ): LabelDetail => {
-    const source = detailed ?? label;
-    return {
-      id: source.id ?? '',
-      name: source.name ?? '',
-      type: source.type === 'user' ? 'user' : 'system',
-      messages_total: source.messagesTotal ?? 0,
-      messages_unread: source.messagesUnread ?? 0,
-      threads_total: source.threadsTotal ?? 0,
-      threads_unread: source.threadsUnread ?? 0,
-      color: source.color
-        ? { text: source.color.textColor ?? '', background: source.color.backgroundColor ?? '' }
-        : null,
-      visibility: source.labelListVisibility ?? 'labelShow',
-    };
-  };
 
   // Map detailed user labels by ID for easy lookup
   const detailedMap = new Map(detailedUserLabels.map((l) => [l.id, l]));
@@ -211,19 +216,7 @@ export async function createLabel(
 
   labelCache.invalidate();
 
-  return {
-    id: created.id ?? '',
-    name: created.name ?? '',
-    type: 'user',
-    messages_total: 0,
-    messages_unread: 0,
-    threads_total: 0,
-    threads_unread: 0,
-    color: created.color
-      ? { text: created.color.textColor ?? '', background: created.color.backgroundColor ?? '' }
-      : null,
-    visibility: created.labelListVisibility ?? 'labelShow',
-  };
+  return toDetail(created);
 }
 
 /**
@@ -245,11 +238,7 @@ export async function updateLabel(
   updates: { new_name?: string; color?: { text: string; background: string } },
 ): Promise<LabelDetail> {
   // Resolve name to ID if needed
-  let id = nameOrId;
-  const resolvedId = await labelCache.lookup(nameOrId);
-  if (resolvedId != null) {
-    id = resolvedId;
-  }
+  const id = (await labelCache.lookup(nameOrId)) ?? nameOrId;
 
   const updated = await client.labels.update(id, {
     name: updates.new_name,
@@ -260,17 +249,5 @@ export async function updateLabel(
 
   labelCache.invalidate();
 
-  return {
-    id: updated.id ?? '',
-    name: updated.name ?? '',
-    type: updated.type === 'user' ? 'user' : 'system',
-    messages_total: updated.messagesTotal ?? 0,
-    messages_unread: updated.messagesUnread ?? 0,
-    threads_total: updated.threadsTotal ?? 0,
-    threads_unread: updated.threadsUnread ?? 0,
-    color: updated.color
-      ? { text: updated.color.textColor ?? '', background: updated.color.backgroundColor ?? '' }
-      : null,
-    visibility: updated.labelListVisibility ?? 'labelShow',
-  };
+  return toDetail(updated);
 }

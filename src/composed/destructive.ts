@@ -14,6 +14,7 @@ import type {
   DeleteLabelResult,
   DeleteFilterResult,
 } from '../types.js';
+import { buildRfc2822Message } from './helpers.js';
 import { logger } from '../logger.js';
 
 const log = logger.child('composed:destructive');
@@ -75,11 +76,7 @@ export async function deleteLabel(
   labelCache: LabelCache,
   nameOrId: string,
 ): Promise<DeleteLabelResult> {
-  let id = nameOrId;
-  const resolvedId = await labelCache.lookup(nameOrId);
-  if (resolvedId != null) {
-    id = resolvedId;
-  }
+  const id = (await labelCache.lookup(nameOrId)) ?? nameOrId;
 
   // Fetch label details BEFORE deleting so we can report what was affected
   let labelName = nameOrId;
@@ -134,22 +131,14 @@ export async function deleteFilter(
   let criteriaSummary = 'unknown criteria';
   try {
     const filter = await client.filters.get(filterId);
-    const parts: string[] = [];
-    if (filter.criteria?.from != null) {
-      parts.push(`from:${filter.criteria.from}`);
-    }
-    if (filter.criteria?.to != null) {
-      parts.push(`to:${filter.criteria.to}`);
-    }
-    if (filter.criteria?.subject != null) {
-      parts.push(`subject:${filter.criteria.subject}`);
-    }
-    if (filter.criteria?.query != null) {
-      parts.push(`query:${filter.criteria.query}`);
-    }
-    if (filter.criteria?.hasAttachment === true) {
-      parts.push('has:attachment');
-    }
+    const c = filter.criteria;
+    const parts = [
+      c?.from != null && `from:${c.from}`,
+      c?.to != null && `to:${c.to}`,
+      c?.subject != null && `subject:${c.subject}`,
+      c?.query != null && `query:${c.query}`,
+      c?.hasAttachment === true && 'has:attachment',
+    ].filter((x): x is string => typeof x === 'string');
     criteriaSummary = parts.length > 0 ? parts.join(', ') : 'no specific criteria';
   } catch (err) {
     log.debug(
@@ -234,18 +223,7 @@ export async function sendMessage(
     threadId?: string;
   },
 ): Promise<SendResult> {
-  const lines: string[] = [`To: ${options.to}`, `Subject: ${options.subject}`];
-  if (options.cc != null) {
-    lines.push(`Cc: ${options.cc}`);
-  }
-  if (options.bcc != null) {
-    lines.push(`Bcc: ${options.bcc}`);
-  }
-  lines.push(`Content-Type: ${options.contentType ?? 'text/plain'}; charset=utf-8`);
-  lines.push('');
-  lines.push(options.body);
-
-  const raw = Buffer.from(lines.join('\r\n')).toString('base64url');
+  const raw = Buffer.from(buildRfc2822Message(options)).toString('base64url');
   const result = await client.messages.send(raw, options.threadId);
   return {
     message_id: result.id ?? '',

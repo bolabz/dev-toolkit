@@ -4,7 +4,13 @@
 
 import type { GmailClient } from '../client/index.js';
 import type { LabelCache } from './labels.js';
-import { parseContactList, parseDate, hasAttachments } from './helpers.js';
+import {
+  parseContactList,
+  parseDate,
+  hasAttachments,
+  headerMap,
+  buildRfc2822Message,
+} from './helpers.js';
 import { processMessagePayload } from './body-processing.js';
 import type { DraftSummary, DraftDetail } from '../types.js';
 import he from 'he';
@@ -38,12 +44,7 @@ export async function getDrafts(
   const drafts: DraftDetail[] = [];
   for (const raw of rawDrafts) {
     const msg = raw.message;
-    const headers = new Map<string, string>();
-    for (const h of msg?.payload?.headers ?? []) {
-      if (h.name != null && h.value != null) {
-        headers.set(h.name, h.value);
-      }
-    }
+    const headers = headerMap(msg?.payload?.headers ?? []);
 
     let bodyText: string | null = null;
     if (includeBody && msg?.payload) {
@@ -102,12 +103,7 @@ export async function createDraft(
   const draft = await client.drafts.create(encoded, options.threadId);
 
   const msg = draft.message;
-  const headers = new Map<string, string>();
-  for (const h of msg?.payload?.headers ?? []) {
-    if (h.name != null && h.value != null) {
-      headers.set(h.name, h.value);
-    }
-  }
+  const headers = headerMap(msg?.payload?.headers ?? []);
 
   return {
     draft_id: draft.id ?? '',
@@ -121,35 +117,4 @@ export async function createDraft(
     size_bytes: msg?.sizeEstimate ?? 0,
     has_attachments: false,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function buildRfc2822Message(options: {
-  to?: string;
-  cc?: string;
-  bcc?: string;
-  subject?: string;
-  body: string;
-  contentType?: string;
-}): string {
-  const lines: string[] = [];
-  if (options.to != null) {
-    lines.push(`To: ${options.to}`);
-  }
-  if (options.cc != null) {
-    lines.push(`Cc: ${options.cc}`);
-  }
-  if (options.bcc != null) {
-    lines.push(`Bcc: ${options.bcc}`);
-  }
-  if (options.subject != null) {
-    lines.push(`Subject: ${options.subject}`);
-  }
-  lines.push(`Content-Type: ${options.contentType ?? 'text/plain'}; charset=utf-8`);
-  lines.push('');
-  lines.push(options.body);
-  return lines.join('\r\n');
 }
