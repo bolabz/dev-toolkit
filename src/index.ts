@@ -404,8 +404,33 @@ export class GmailToolkit {
 export { GmailClient } from './client/index.js';
 export { LabelCache } from './composed/index.js';
 export { ensureAuthenticated } from './auth.js';
-export { resolveToolRegistry, getEnabledTools, getToolsByCategory } from './config/tools.js';
-export { Logger, logger } from './logger.js';
-export type { LogLevel } from './logger.js';
+export {
+  resolveToolRegistry,
+  getEnabledTools,
+  getToolsByCategory,
+} from './mcp-server/tool-registry.js';
 export { GmailApiError, GmailValidationError } from './errors.js';
-export * from './types.js';
+export type {
+  Contact,
+  AttachmentInfo,
+  SearchResult,
+  MessageSummary,
+  SearchSummary,
+  FullMessage,
+  FullThread,
+  LabelDetail,
+  LabelOverview,
+  DraftDetail,
+  DraftSummary,
+  FilterCriteria,
+  FilterActions,
+  FilterDetail,
+  FilterOverview,
+  AccountOverview,
+  ModifyResult,
+  DeleteResult,
+  DeleteLabelResult,
+  DeleteFilterResult,
+  SendResult,
+  GmailToolkitError,
+} from './types.js';

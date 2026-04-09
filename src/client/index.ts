@@ -47,13 +47,6 @@ export class GmailClient {
   }
 }
 
-export { MessagesClient } from './messages.js';
-export { ThreadsClient } from './threads.js';
-export { LabelsClient } from './labels.js';
-export { DraftsClient } from './drafts.js';
-export { FiltersClient } from './filters.js';
-export { SettingsClient } from './settings.js';
-export { HistoryClient } from './history.js';
 export type { MessageFormat, ListMessagesOptions } from './messages.js';
 export type { ListThreadsOptions } from './threads.js';
 export type { CreateLabelOptions } from './labels.js';

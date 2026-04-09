@@ -9,7 +9,7 @@ import { z } from 'zod';
 import type { GmailClient } from '../client/index.js';
 import type { LabelCache } from '../composed/labels.js';
 import { getLabels, createLabel, updateLabel, deleteLabel } from '../composed/index.js';
-import type { ToolName, ToolConfig } from '../config/tools.js';
+import type { ToolName, ToolConfig } from './tool-registry.js';
 import { toMcpError } from './utils.js';
 
 /**

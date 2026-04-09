@@ -40,7 +40,7 @@ npm run ci           # Build + full test suite
 
 - **Layer 1** (`src/client/`): 1:1 Gmail API v1 wrapper with rate limiting, batching, pagination
 - **Layer 2** (`src/composed/`): Aggregated operations with label resolution, body processing, analytics
-- **Layer 3** (`src/mcp-server.ts` + `src/config/tools.ts`): MCP server with 20 tools (15 enabled, 5 destructive/disabled)
+- **Layer 3** (`src/mcp-server.ts` + `src/mcp-server/`): MCP server with domain-based tool modules, resources, and prompts (20 tools: 15 enabled, 5 destructive/disabled)
 - **Auth** (`src/auth.ts`): Seamless OAuth2 — auto-refreshes tokens, opens browser on first use
 - **Logger** (`src/logger.ts`): Singleton logger — all output to stderr, env-var controlled (`GMAIL_LOG_LEVEL`)
 - **Types** (`src/types.ts`): Zod schemas serving as TypeScript types + runtime validation + MCP schemas
@@ -49,14 +49,16 @@ npm run ci           # Build + full test suite
 
 - `docs/Gmail_Toolkit_Project_Spec.md` — Full architecture spec (source of truth)
 - `docs/Gmail_API_Complete_Reference.md` — Gmail API endpoint reference
+- `docs/known-gaps.md` — Tracked limitations and planned improvements
 - `src/index.ts` — Library entry point (`GmailToolkit` class)
-- `src/mcp-server.ts` — MCP server entry point
+- `src/mcp-server.ts` — MCP server entry point (orchestrator)
+- `src/mcp-server/tool-registry.ts` — Tool configuration and enable/disable registry
 - `src/logger.ts` — Logger singleton with child loggers
 
 ## Dev Tooling
 
 - **Prettier** (`.prettierrc`): Code formatting — single quotes, trailing commas, 100 char width
-- **ESLint** (`eslint.config.js`): Flat config — strict TypeScript, JSDoc enforcement, `no-console` (logger.ts exempt)
+- **ESLint** (`eslint.config.js`): Flat config — strict TypeScript, JSDoc enforcement, `no-console` (logger.ts exempt), `max-lines` (400 code-lines, skipBlankLines/skipComments)
 - **TypeDoc** (`typedoc.json`): API documentation generation with strict validation
 - **Lefthook** (`lefthook.yml`): Git hooks — pre-commit (prettier + eslint), pre-push (typecheck + docs + tests), commit-msg (commitlint)
 - **Commitlint** (`commitlint.config.js`): Conventional commit message enforcement
@@ -72,7 +74,4 @@ Requires `credentials.json` from Google Cloud Console (gitignored). On first run
 
 ## Known Gaps
 
-- MCP SDK uses deprecated `server.tool()` API — migrate to `registerTool()` (disabled via ESLint override)
-- `messages.import()` endpoint not implemented (low priority)
-- True HTTP batch requests use concurrent p-queue calls instead of multipart batching
-- No README.md
+See `docs/known-gaps.md` for full details including Layer 2 coverage audit and implementation guidance.
