@@ -68,7 +68,7 @@ const MessageSummarySchema = z.object({
  */
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
 
-export /**
+/**
  *
  */
 const SearchSummarySchema = z.object({
@@ -130,7 +130,7 @@ export type FullMessage = z.infer<typeof FullMessageSchema>;
 // Full Thread
 // ---------------------------------------------------------------------------
 
-export /**
+/**
  *
  */
 const LabelContextSchema = z.object({
@@ -138,10 +138,6 @@ const LabelContextSchema = z.object({
   messages_total: z.number(),
   messages_unread: z.number(),
 });
-/**
- *
- */
-export type LabelContext = z.infer<typeof LabelContextSchema>;
 
 export /**
  *
@@ -252,7 +248,7 @@ export type DraftSummary = z.infer<typeof DraftSummarySchema>;
 // Filters
 // ---------------------------------------------------------------------------
 
-export /**
+/**
  *
  */
 const FilterCriteriaSchema = z.object({
@@ -270,7 +266,7 @@ const FilterCriteriaSchema = z.object({
  */
 export type FilterCriteria = z.infer<typeof FilterCriteriaSchema>;
 
-export /**
+/**
  *
  */
 const FilterActionsSchema = z.object({

@@ -46,8 +46,3 @@ export class GmailClient {
     this.history = new HistoryClient(auth, sharedQueue);
   }
 }
-
-export type { MessageFormat, ListMessagesOptions } from './messages.js';
-export type { ListThreadsOptions } from './threads.js';
-export type { CreateLabelOptions } from './labels.js';
-export type { ListHistoryOptions } from './history.js';

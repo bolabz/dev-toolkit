@@ -45,8 +45,10 @@
   4. Tool registry metadata in `src/mcp-server/tool-registry.ts` if MCP-facing.
   5. Shared schemas/types in `src/types.ts` if output contract changes.
 - When adding an MCP tool handler, wrap the Layer 2 call in `try/catch` and return `toMcpError(err, 'tool_name')` on failure — see any existing handler in `src/mcp-server/tools-*.ts` for the pattern.
+- Run `npm run knip` to detect unused exports, files, and dependencies. Fix findings before committing.
+- Public API changes must update the API report: run `npm run build && npm run api:update` and commit the updated `etc/gmail-toolkit.api.md`.
 - Maintain JSDoc completeness: ESLint + TypeDoc are strict and can fail CI (`eslint.config.js`, `typedoc.json`).
-- Git hooks are active (`lefthook.yml`): pre-commit formats/lints staged files; pre-push runs typecheck, docs check, and unit tests.
+- Git hooks are active (`lefthook.yml`): pre-commit formats/lints staged files; pre-push runs full test suite (`npm run test`).
 
 ## Current Testing Reality
 

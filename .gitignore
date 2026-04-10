@@ -34,3 +34,6 @@ docs/typedoc/
 
 # Test coverage
 coverage/
+
+# API Extractor temp output
+temp/
