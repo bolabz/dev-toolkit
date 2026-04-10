@@ -10,8 +10,8 @@ import { logger } from '../logger.js';
 
 const log = logger.child('mcp');
 
-/** Standard MCP tool result shape. */
-type McpToolResult = {
+/** Standard return shape for every MCP tool handler. */
+export type McpToolResult = {
   content: Array<{ type: 'text'; text: string }>;
   isError?: true;
 };

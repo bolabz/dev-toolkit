@@ -18,7 +18,9 @@ import { SettingsClient } from './settings.js';
 import { HistoryClient } from './history.js';
 
 /**
- *
+ * Façade that composes all Gmail API resource clients into a single object.
+ * All sub-clients share one authenticated OAuth2 client and one rate-limiting
+ * PQueue to stay within Gmail's 250 quota-units/second limit.
  */
 export class GmailClient {
   readonly messages: MessagesClient;
