@@ -14,8 +14,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { logger } from './logger.js';
-import { createGmailContext } from './composed/index.js';
-import { resolveToolRegistry } from './mcp-server/tool-registry.js';
+import { createGmailContext, type GmailContext } from './composed/index.js';
+import { resolveToolRegistry, type ToolName, type ToolConfig } from './mcp-server/tool-registry.js';
 
 import { registerMessageTools } from './mcp-server/tools-messages.js';
 import { registerThreadTools } from './mcp-server/tools-threads.js';
@@ -25,6 +25,13 @@ import { registerFilterTools } from './mcp-server/tools-filters.js';
 import { registerAccountTools } from './mcp-server/tools-account.js';
 import { registerResources } from './mcp-server/resources.js';
 import { registerPrompts } from './mcp-server/prompts.js';
+
+/** Signature shared by all domain-level tool registration functions. */
+type ToolRegistrar = (
+  server: McpServer,
+  registry: Record<ToolName, ToolConfig>,
+  context: GmailContext,
+) => void;
 
 const log = logger.child('mcp');
 
@@ -45,13 +52,18 @@ async function startServer() {
   const tokenPath = process.env.GMAIL_TOKEN_PATH ?? './token.json';
   const context = await createGmailContext(credentialsPath, tokenPath);
 
-  // Register all MCP capabilities
-  registerMessageTools(server, toolRegistry, context);
-  registerThreadTools(server, toolRegistry, context);
-  registerLabelTools(server, toolRegistry, context);
-  registerDraftTools(server, toolRegistry, context);
-  registerFilterTools(server, toolRegistry, context);
-  registerAccountTools(server, toolRegistry, context);
+  // Register all MCP tool capabilities (domain-based, uniform signature)
+  const toolRegistrars: ToolRegistrar[] = [
+    registerMessageTools,
+    registerThreadTools,
+    registerLabelTools,
+    registerDraftTools,
+    registerFilterTools,
+    registerAccountTools,
+  ];
+  for (const register of toolRegistrars) {
+    register(server, toolRegistry, context);
+  }
   registerResources(server, context);
   registerPrompts(server);
 

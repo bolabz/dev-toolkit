@@ -7,7 +7,7 @@
 
 import { ensureAuthenticated } from '../auth.js';
 import { GmailClient } from '../client/index.js';
-import { LabelCache } from './labels.js';
+import { LabelCache } from './label-cache.js';
 
 /**
  * Authenticated Gmail context containing the API client and label cache.

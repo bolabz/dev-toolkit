@@ -28,17 +28,33 @@ interface ReplyParser {
 }
 type ReplyParserConstructor = new () => ReplyParser;
 
-let CachedParserClass: ReplyParserConstructor | undefined;
+// ---------------------------------------------------------------------------
+// Reply Parser Cache
+// ---------------------------------------------------------------------------
 
-async function getReplyParser(): Promise<ReplyParser> {
-  if (CachedParserClass == null) {
-    const mod = (await import('email-reply-parser')) as {
-      default?: ReplyParserConstructor;
-    } & Record<string, unknown>;
-    CachedParserClass = (mod.default ?? mod) as ReplyParserConstructor;
+/**
+ * Lazily loads and caches the email-reply-parser module constructor.
+ * Encapsulates the mutable singleton to prevent uncontrolled module-scope state.
+ */
+class ReplyParserCache {
+  private instance: ReplyParserConstructor | undefined;
+
+  /**
+   * Return a fresh ReplyParser instance, loading the module on first call.
+   * @returns A ReplyParser instance ready to parse replies
+   */
+  async get(): Promise<ReplyParser> {
+    if (this.instance == null) {
+      const mod = (await import('email-reply-parser')) as {
+        default?: ReplyParserConstructor;
+      } & Record<string, unknown>;
+      this.instance = (mod.default ?? mod) as ReplyParserConstructor;
+    }
+    return new this.instance();
   }
-  return new CachedParserClass();
 }
+
+const replyParserCache = new ReplyParserCache();
 
 // ---------------------------------------------------------------------------
 // HTML → Text Configuration
@@ -78,40 +94,16 @@ export async function processBody(
 ): Promise<{ text: string; html: string | null }> {
   const { stripReplies = true, includeHtml = false } = options;
 
-  // Parse MIME tree
   const parsed = await simpleParser(
     typeof rawMessage === 'string'
       ? Buffer.from(rawMessage, 'base64url' as BufferEncoding)
       : rawMessage,
   );
 
-  let text = extractText(parsed);
-
-  // 1b. If text looks like raw HTML (missed conversion), convert it now
-  text = stripResidualHtml(text);
-
-  // 2. Strip quoted reply chains (skip for thread reads)
-  if (stripReplies) {
-    text = await stripReplyChain(text);
-  }
-
-  // 3. Strip standard signatures
-  text = trimStandardSignature(text);
-
-  // 4. Remove CID image references and [image: ...] markers
-  text = text.replace(/\[cid:[^\]]+\]/g, '').replace(/\[image:[^\]]+\]/g, '[image]');
-
-  // 5. Shorten tracking URLs
-  text = shortenTrackingUrls(text);
-
-  // 6. Decode HTML entities
-  text = he.decode(text);
-
-  // 7. Collapse excessive whitespace
-  text = text.replace(/\n{3,}/g, '\n\n').trim();
+  const rawText = extractText(parsed);
 
   return {
-    text,
+    text: await applyCleaningPipeline(rawText, stripReplies),
     html: includeHtml && typeof parsed.html === 'string' ? parsed.html : null,
   };
 }
@@ -144,7 +136,6 @@ export async function processMessagePayload(
   let text = '';
   let html: string | null = null;
 
-  // Extract text and HTML from payload parts
   const textPart = findPart(payload, 'text/plain');
   const htmlPart = findPart(payload, 'text/html');
 
@@ -157,7 +148,6 @@ export async function processMessagePayload(
     text = htmlToText(rawHtml, HTML_TO_TEXT_OPTIONS);
     if (includeHtml) html = rawHtml;
   } else if (payload.body?.data != null) {
-    // Simple single-part message
     if (mimeType === 'text/html') {
       const rawHtml = Buffer.from(payload.body.data, 'base64url' as BufferEncoding).toString(
         'utf-8',
@@ -173,20 +163,47 @@ export async function processMessagePayload(
     html = Buffer.from(htmlPart.body.data, 'base64url' as BufferEncoding).toString('utf-8');
   }
 
-  // If text looks like raw HTML (missed conversion), convert it now
-  text = stripResidualHtml(text);
+  return {
+    text: await applyCleaningPipeline(text, stripReplies),
+    html,
+  };
+}
 
-  // Apply pipeline steps 2-7
+// ---------------------------------------------------------------------------
+// Shared Cleaning Pipeline
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply the shared text-cleaning pipeline (steps 2–7) to extracted email text.
+ * Shared by both {@link processBody} and {@link processMessagePayload} to
+ * eliminate duplication. Operates on already-extracted plain text.
+ * @param text - The raw extracted text to clean
+ * @param stripReplies - Whether to strip quoted reply chains
+ * @returns The cleaned, normalised plain text
+ */
+async function applyCleaningPipeline(text: string, stripReplies: boolean): Promise<string> {
+  // 1. Strip any residual HTML that survived extraction
+  let result = stripResidualHtml(text);
+
+  // 2. Strip quoted reply chains (skip for thread reads)
   if (stripReplies) {
-    text = await stripReplyChain(text);
+    result = await stripReplyChain(result);
   }
-  text = trimStandardSignature(text);
-  text = text.replace(/\[cid:[^\]]+\]/g, '').replace(/\[image:[^\]]+\]/g, '[image]');
-  text = shortenTrackingUrls(text);
-  text = he.decode(text);
-  text = text.replace(/\n{3,}/g, '\n\n').trim();
 
-  return { text, html };
+  // 3. Strip standard signatures
+  result = trimStandardSignature(result);
+
+  // 4. Remove CID image references and [image: ...] markers
+  result = result.replace(/\[cid:[^\]]+\]/g, '').replace(/\[image:[^\]]+\]/g, '[image]');
+
+  // 5. Shorten tracking URLs
+  result = shortenTrackingUrls(result);
+
+  // 6. Decode HTML entities
+  result = he.decode(result);
+
+  // 7. Collapse excessive whitespace
+  return result.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -204,13 +221,10 @@ export async function processMessagePayload(
 function stripResidualHtml(text: string): string {
   if (!text) return text;
 
-  // Full HTML document — run through html-to-text converter
   if (/<html[\s>]/i.test(text) || /<!doctype\s+html/i.test(text)) {
     return htmlToText(text, HTML_TO_TEXT_OPTIONS);
   }
 
-  // Inline HTML tags in otherwise plain text — strip them
-  // Matches common formatting tags that appear in text/plain parts
   if (
     /<\/?(?:strong|em|b|i|u|a|span|div|p|br|h[1-6]|ul|ol|li|table|tr|td|th|img|font|center|blockquote)\b[^>]*>/i.test(
       text,
@@ -234,12 +248,12 @@ function extractText(parsed: ParsedMail): string {
 
 async function stripReplyChain(text: string): Promise<string> {
   try {
-    const parser = await getReplyParser();
+    const parser = await replyParserCache.get();
     const result = parser.parseReply(text);
-    return result || text; // fall back to full text if parser returns empty
+    return result || text;
   } catch (err) {
     log.debug('email-reply-parser failed, returning unstripped text', err);
-    return text; // non-fatal — return unmodified
+    return text;
   }
 }
 
@@ -252,11 +266,9 @@ async function stripReplyChain(text: string): Promise<string> {
  * @returns The text with standard signatures removed
  */
 function trimStandardSignature(text: string): string {
-  // RFC 3676 standard signature delimiter
   const sigDelimiterIndex = text.indexOf('\n-- \n');
   const base = sigDelimiterIndex !== -1 ? text.substring(0, sigDelimiterIndex) : text;
 
-  // Common mobile / app signatures
   const mobilePatterns = [
     /\n?Sent from my [^\n]+$/i,
     /\n?Sent from Mail for [^\n]+$/i,
@@ -275,21 +287,20 @@ function trimStandardSignature(text: string): string {
  * @returns The text with tracking URLs replaced by domain-only references
  */
 function shortenTrackingUrls(text: string): string {
-  // Domains that are ALWAYS tracking — shorten regardless of URL length
   const alwaysTrackingDomains = [
     /\.list-manage\.com/i,
     /email\.mg\./i,
     /sendgrid\.net/i,
     /mandrillapp\.com/i,
-    /click\.\w+\.com/i, // click.example.com pattern
-    /links\.\w+\.com/i, // links.example.com pattern
-    /track\.\w+\.com/i, // track.example.com pattern
-    /t\.co\//i, // Twitter/X shortener
+    /click\.\w+\.com/i,
+    /links\.\w+\.com/i,
+    /track\.\w+\.com/i,
+    /t\.co\//i,
     /bit\.ly\//i,
     /mailchimp\.com/i,
     /constantcontact\.com/i,
     /hubspot\.com.*\/track/i,
-    /mkto-\w+/i, // Marketo
+    /mkto-\w+/i,
     /pardot\.com/i,
     /emltrk\.com/i,
     /awstrack\.me/i,
@@ -307,7 +318,6 @@ function shortenTrackingUrls(text: string): string {
   ];
 
   return text.replace(/https?:\/\/[^\s<>"{}|\\^`[\]]+/g, (url) => {
-    // Always shorten known tracking domains
     const isKnownTracker = alwaysTrackingDomains.some((p) => p.test(url));
     if (isKnownTracker) {
       try {
@@ -319,7 +329,6 @@ function shortenTrackingUrls(text: string): string {
       }
     }
 
-    // For other URLs, apply length + pattern heuristic
     if (url.length <= 80) return url;
 
     const hasTrackingQuery = trackingQueryPatterns.some((p) => p.test(url));

@@ -7,7 +7,7 @@
 
 import type { gmail_v1 } from 'googleapis';
 import type { Contact, FullMessage, AttachmentInfo } from '../types.js';
-import type { LabelCache } from './labels.js';
+import type { LabelCache } from './label-cache.js';
 import { processMessagePayload } from './body-processing.js';
 import { logger } from '../logger.js';
 

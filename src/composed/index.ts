@@ -6,7 +6,7 @@
  * they are imported directly from ./helpers.js within the composed layer.
  */
 
-export { LabelCache } from './labels.js';
+export { LabelCache } from './label-cache.js';
 export { createGmailContext } from './context.js';
 export type { GmailContext } from './context.js';
 export { getLabels, createLabel, updateLabel, deleteLabel } from './labels.js';

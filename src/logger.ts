@@ -43,7 +43,7 @@ const LEVEL_LABELS: Record<Exclude<LogLevel, 'silent'>, string> = {
 export class Logger {
   private readonly root: Logger;
   private readonly prefix: string;
-  private _level: LogLevel; // only meaningful on root instance
+  private level: LogLevel; // only meaningful on root instance
 
   /**
    * Create a Logger instance. Prefer using the module-level `logger` singleton
@@ -57,8 +57,8 @@ export class Logger {
   constructor(options?: { prefix?: string; level?: LogLevel; root?: Logger }) {
     this.prefix = options?.prefix ?? 'gmail-toolkit';
     this.root = options?.root ?? this;
-    this._level = options?.root
-      ? options.root._level // child inherits (but delegates at log time)
+    this.level = options?.root
+      ? options.root.level // child inherits (but delegates at log time)
       : (options?.level ?? resolveLogLevel());
   }
 
@@ -129,7 +129,7 @@ export class Logger {
    * @param level - The new minimum log level
    */
   setLevel(level: LogLevel): void {
-    this.root._level = level;
+    this.root.level = level;
   }
 
   /**
@@ -137,7 +137,7 @@ export class Logger {
    * @returns The active log level
    */
   getLevel(): LogLevel {
-    return this.root._level;
+    return this.root.level;
   }
 
   // -------------------------------------------------------------------------
@@ -145,7 +145,7 @@ export class Logger {
   // -------------------------------------------------------------------------
 
   private log(level: Exclude<LogLevel, 'silent'>, message: string, args: unknown[]): void {
-    if (LEVEL_PRIORITY[level] < LEVEL_PRIORITY[this.root._level]) {
+    if (LEVEL_PRIORITY[level] < LEVEL_PRIORITY[this.root.level]) {
       return;
     }
 

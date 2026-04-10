@@ -4,7 +4,7 @@
 
 import type { gmail_v1 } from 'googleapis';
 import type { GmailClient } from '../client/index.js';
-import type { LabelCache } from './labels.js';
+import type { LabelCache } from './label-cache.js';
 import type { FilterOverview, FilterDetail, DeleteFilterResult } from '../types.js';
 import { logger } from '../logger.js';
 

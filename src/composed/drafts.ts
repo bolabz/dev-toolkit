@@ -3,7 +3,7 @@
  */
 
 import type { GmailClient } from '../client/index.js';
-import type { LabelCache } from './labels.js';
+import type { LabelCache } from './label-cache.js';
 import {
   parseContactList,
   parseDate,
