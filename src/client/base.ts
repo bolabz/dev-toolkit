@@ -27,12 +27,14 @@ export const RATE_LIMIT_CONFIG = {
 // ---------------------------------------------------------------------------
 
 /**
- *
+ * Abstract base class for all Gmail API resource clients.
+ * Provides rate-limited request execution, batch execution, and pagination
+ * shared across all sub-clients. Never instantiated directly.
  */
-export class GmailClientBase {
+export abstract class GmailClientBase {
   protected gmail: gmail_v1.Gmail;
   protected queue: PQueue;
-  protected userId = 'me';
+  protected readonly userId = 'me';
 
   /**
    * Create a new GmailClientBase with the given OAuth2 credentials.
