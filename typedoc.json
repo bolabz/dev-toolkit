@@ -21,6 +21,7 @@
     "includeFolders": true
   },
   "highlightLanguages": ["typescript", "bash", "json"],
+  "disableSources": true,
   "treatWarningsAsErrors": true,
   "treatValidationWarningsAsErrors": true,
   "requiredToBeDocumented": [

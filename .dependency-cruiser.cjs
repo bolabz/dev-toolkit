@@ -30,7 +30,7 @@ module.exports = {
       name: 'layer-3-cannot-import-layer-1',
       severity: 'error',
       comment:
-          'MCP server (Layer 3) must use GmailContext from Layer 2, not import Layer 1 directly.',
+        'MCP server (Layer 3) must use GmailContext from Layer 2, not import Layer 1 directly.',
       from: { path: '^src/mcp-server' },
       to: { path: '^src/client/' },
     },

@@ -13,40 +13,30 @@ import { z } from 'zod';
 // Primitives
 // ---------------------------------------------------------------------------
 
-export /**
- *
- */
-const ContactSchema = z.object({
+/** Zod schema for a named email contact. */
+export const ContactSchema = z.object({
   name: z.string().nullable(),
   email: z.string(),
 });
-/**
- *
- */
+/** A named email contact with an optional display name and a required address. */
 export type Contact = z.infer<typeof ContactSchema>;
 
-export /**
- *
- */
-const AttachmentInfoSchema = z.object({
+/** Zod schema for attachment metadata returned alongside a message. */
+export const AttachmentInfoSchema = z.object({
   id: z.string(),
   filename: z.string(),
   mime_type: z.string(),
   size_bytes: z.number(),
 });
-/**
- *
- */
+/** Metadata for a single email attachment (does not include the binary payload). */
 export type AttachmentInfo = z.infer<typeof AttachmentInfoSchema>;
 
 // ---------------------------------------------------------------------------
 // Search / List Results
 // ---------------------------------------------------------------------------
 
-export /**
- *
- */
-const MessageSummarySchema = z.object({
+/** Zod schema for a lightweight message row returned in search/list results. */
+export const MessageSummarySchema = z.object({
   id: z.string(),
   thread_id: z.string(),
   from: ContactSchema,
@@ -64,46 +54,40 @@ const MessageSummarySchema = z.object({
   body_text: z.string().nullable().optional(),
 });
 /**
- *
+ * Lightweight message representation included in search results.
+ * Contains headers, labels, and optional processed body text but omits raw MIME parts.
  */
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
 
-/**
- *
- */
-const SearchSummarySchema = z.object({
+/** Zod schema for aggregate analytics derived from a search result set. */
+export const SearchSummarySchema = z.object({
   unread_count: z.number(),
   senders: z.record(z.string(), z.number()),
   labels: z.record(z.string(), z.number()),
 });
 /**
- *
+ * Aggregate analytics computed from a set of search results:
+ * unread count, sender frequency map, and label frequency map.
  */
 export type SearchSummary = z.infer<typeof SearchSummarySchema>;
 
-export /**
- *
- */
-const SearchResultSchema = z.object({
+/** Zod schema for a complete paginated message search result. */
+export const SearchResultSchema = z.object({
   total_estimate: z.number(),
   returned: z.number(),
   next_page_token: z.string().nullable(),
   messages: z.array(MessageSummarySchema),
   summary: SearchSummarySchema,
 });
-/**
- *
- */
+/** Complete paginated search result: message rows, paging token, and summary analytics. */
 export type SearchResult = z.infer<typeof SearchResultSchema>;
 
 // ---------------------------------------------------------------------------
 // Full Message
 // ---------------------------------------------------------------------------
 
-export /**
- *
- */
-const FullMessageSchema = z.object({
+/** Zod schema for a fully hydrated message with processed body text. */
+export const FullMessageSchema = z.object({
   id: z.string(),
   thread_id: z.string(),
   from: ContactSchema,
@@ -122,7 +106,8 @@ const FullMessageSchema = z.object({
   web_url: z.string(),
 });
 /**
- *
+ * Complete message with all headers, processed plain-text and HTML body,
+ * attachment metadata, and resolved label names.
  */
 export type FullMessage = z.infer<typeof FullMessageSchema>;
 
@@ -130,19 +115,15 @@ export type FullMessage = z.infer<typeof FullMessageSchema>;
 // Full Thread
 // ---------------------------------------------------------------------------
 
-/**
- *
- */
+/** Zod schema for per-label counts attached to a thread. */
 const LabelContextSchema = z.object({
   name: z.string(),
   messages_total: z.number(),
   messages_unread: z.number(),
 });
 
-export /**
- *
- */
-const FullThreadSchema = z.object({
+/** Zod schema for a fully hydrated email thread including all messages. */
+export const FullThreadSchema = z.object({
   id: z.string(),
   subject: z.string(),
   participants: z.array(ContactSchema),
@@ -157,7 +138,8 @@ const FullThreadSchema = z.object({
   }),
 });
 /**
- *
+ * Full email thread with all messages in chronological order, resolved label names,
+ * participant list, and optional per-label message counts.
  */
 export type FullThread = z.infer<typeof FullThreadSchema>;
 
@@ -165,10 +147,8 @@ export type FullThread = z.infer<typeof FullThreadSchema>;
 // Labels
 // ---------------------------------------------------------------------------
 
-export /**
- *
- */
-const LabelDetailSchema = z.object({
+/** Zod schema for a fully resolved label definition including message counts and color. */
+export const LabelDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(['system', 'user']),
@@ -184,15 +164,11 @@ const LabelDetailSchema = z.object({
     .nullable(),
   visibility: z.string(),
 });
-/**
- *
- */
+/** Complete label definition including message/thread counts, color, and visibility settings. */
 export type LabelDetail = z.infer<typeof LabelDetailSchema>;
 
-export /**
- *
- */
-const LabelOverviewSchema = z.object({
+/** Zod schema for the full label overview grouped by type with summary statistics. */
+export const LabelOverviewSchema = z.object({
   system_labels: z.array(LabelDetailSchema),
   user_labels: z.array(LabelDetailSchema),
   categories: z.array(LabelDetailSchema),
@@ -203,7 +179,8 @@ const LabelOverviewSchema = z.object({
   }),
 });
 /**
- *
+ * Full label listing grouped into system labels, user labels, and categories,
+ * with a summary of usage statistics.
  */
 export type LabelOverview = z.infer<typeof LabelOverviewSchema>;
 
@@ -211,10 +188,8 @@ export type LabelOverview = z.infer<typeof LabelOverviewSchema>;
 // Drafts
 // ---------------------------------------------------------------------------
 
-export /**
- *
- */
-const DraftDetailSchema = z.object({
+/** Zod schema for a single draft with headers and optional body. */
+export const DraftDetailSchema = z.object({
   draft_id: z.string(),
   message_id: z.string(),
   thread_id: z.string().nullable(),
@@ -227,31 +202,23 @@ const DraftDetailSchema = z.object({
   has_attachments: z.boolean(),
   body_text: z.string().nullable().optional(),
 });
-/**
- *
- */
+/** Metadata for a single draft message including headers, snippet, and optional processed body. */
 export type DraftDetail = z.infer<typeof DraftDetailSchema>;
 
-export /**
- *
- */
-const DraftSummarySchema = z.object({
+/** Zod schema for a paginated draft listing with total count. */
+export const DraftSummarySchema = z.object({
   total: z.number(),
   drafts: z.array(DraftDetailSchema),
 });
-/**
- *
- */
+/** Paginated collection of drafts with total count and per-draft metadata. */
 export type DraftSummary = z.infer<typeof DraftSummarySchema>;
 
 // ---------------------------------------------------------------------------
 // Filters
 // ---------------------------------------------------------------------------
 
-/**
- *
- */
-const FilterCriteriaSchema = z.object({
+/** Zod schema for Gmail filter match criteria. */
+export const FilterCriteriaSchema = z.object({
   from: z.string().nullable(),
   to: z.string().nullable(),
   subject: z.string().nullable(),
@@ -262,14 +229,13 @@ const FilterCriteriaSchema = z.object({
   size_comparison: z.enum(['smaller', 'larger']).nullable(),
 });
 /**
- *
+ * Criteria that determine which incoming messages a Gmail filter matches
+ * (sender, recipient, subject, query, size, attachment presence, etc.).
  */
 export type FilterCriteria = z.infer<typeof FilterCriteriaSchema>;
 
-/**
- *
- */
-const FilterActionsSchema = z.object({
+/** Zod schema for the actions applied when a Gmail filter matches a message. */
+export const FilterActionsSchema = z.object({
   add_labels: z.array(z.string()),
   remove_labels: z.array(z.string()),
   forward_to: z.string().nullable(),
@@ -277,43 +243,34 @@ const FilterActionsSchema = z.object({
   mark_read: z.boolean(),
 });
 /**
- *
+ * Actions applied to a message when a Gmail filter matches:
+ * label mutations, forwarding address, skip-inbox, and mark-as-read.
  */
 export type FilterActions = z.infer<typeof FilterActionsSchema>;
 
-export /**
- *
- */
-const FilterDetailSchema = z.object({
+/** Zod schema for a complete Gmail filter with criteria and actions. */
+export const FilterDetailSchema = z.object({
   id: z.string(),
   criteria: FilterCriteriaSchema,
   actions: FilterActionsSchema,
 });
-/**
- *
- */
+/** Complete Gmail filter definition pairing a filter ID with its criteria and actions. */
 export type FilterDetail = z.infer<typeof FilterDetailSchema>;
 
-export /**
- *
- */
-const FilterOverviewSchema = z.object({
+/** Zod schema for the full collection of Gmail filters with total count. */
+export const FilterOverviewSchema = z.object({
   total: z.number(),
   filters: z.array(FilterDetailSchema),
 });
-/**
- *
- */
+/** All Gmail filters with a total count and per-filter details. */
 export type FilterOverview = z.infer<typeof FilterOverviewSchema>;
 
 // ---------------------------------------------------------------------------
 // Account
 // ---------------------------------------------------------------------------
 
-export /**
- *
- */
-const AccountOverviewSchema = z.object({
+/** Zod schema for the Gmail account overview aggregating profile and settings data. */
+export const AccountOverviewSchema = z.object({
   email: z.string(),
   messages_total: z.number(),
   threads_total: z.number(),
@@ -354,7 +311,8 @@ const AccountOverviewSchema = z.object({
   pop_enabled: z.boolean(),
 });
 /**
- *
+ * Gmail account overview: profile counters, vacation responder, forwarding,
+ * send-as aliases, delegates, and IMAP/POP status.
  */
 export type AccountOverview = z.infer<typeof AccountOverviewSchema>;
 
@@ -362,35 +320,25 @@ export type AccountOverview = z.infer<typeof AccountOverviewSchema>;
 // Write Operation Results
 // ---------------------------------------------------------------------------
 
-export /**
- *
- */
-const ModifyResultSchema = z.object({
+/** Zod schema for the result of a batch label-modification operation. */
+export const ModifyResultSchema = z.object({
   modified: z.number(),
   failed: z.array(z.string()),
   message: z.string(),
 });
-/**
- *
- */
+/** Result of a batch label-modification: count of modified messages and any failure IDs. */
 export type ModifyResult = z.infer<typeof ModifyResultSchema>;
 
-export /**
- *
- */
-const DeleteResultSchema = z.object({
+/** Zod schema for the result of a single message delete or trash operation. */
+export const DeleteResultSchema = z.object({
   deleted: z.boolean(),
   message: z.string(),
 });
-/**
- *
- */
+/** Result of a single message delete or trash operation with a human-readable summary. */
 export type DeleteResult = z.infer<typeof DeleteResultSchema>;
 
-export /**
- *
- */
-const DeleteLabelResultSchema = z.object({
+/** Zod schema for the result of deleting a label including affected message/thread counts. */
+export const DeleteLabelResultSchema = z.object({
   deleted: z.boolean(),
   label_name: z.string(),
   label_id: z.string(),
@@ -399,34 +347,33 @@ const DeleteLabelResultSchema = z.object({
   message: z.string(),
 });
 /**
- *
+ * Result of deleting a user label: confirmation flag, label details, and counts of
+ * messages and threads that had the label removed.
  */
 export type DeleteLabelResult = z.infer<typeof DeleteLabelResultSchema>;
 
-export /**
- *
- */
-const DeleteFilterResultSchema = z.object({
+/** Zod schema for the result of deleting a Gmail filter rule. */
+export const DeleteFilterResultSchema = z.object({
   deleted: z.boolean(),
   filter_id: z.string(),
   criteria_summary: z.string(),
   message: z.string(),
 });
 /**
- *
+ * Result of deleting a Gmail filter: confirmation flag, filter ID, and a
+ * human-readable summary of the criteria that were removed.
  */
 export type DeleteFilterResult = z.infer<typeof DeleteFilterResultSchema>;
 
-export /**
- *
- */
-const SendResultSchema = z.object({
+/** Zod schema for the result of sending a message or draft. */
+export const SendResultSchema = z.object({
   message_id: z.string(),
   thread_id: z.string().nullable(),
   message: z.string(),
 });
 /**
- *
+ * Result of sending a message or draft: assigned message ID, thread ID, and a
+ * human-readable confirmation.
  */
 export type SendResult = z.infer<typeof SendResultSchema>;
 
@@ -434,13 +381,13 @@ export type SendResult = z.infer<typeof SendResultSchema>;
 // Error (MCP response DTO)
 // ---------------------------------------------------------------------------
 
-export /**
- * Serialised error shape returned by MCP tool handlers when an operation fails.
+/**
+ * Zod schema for the serialised error DTO returned by MCP tool handlers.
  * Tool handlers catch `GmailApiError` / `GmailValidationError` from Layers 1–2
  * and populate this schema before returning `{ content, isError: true }`.
  * Not thrown directly — see `src/errors.ts` for the thrown error classes.
  */
-const GmailToolkitErrorSchema = z.object({
+export const GmailToolkitErrorSchema = z.object({
   code: z.number(),
   message: z.string(),
   operation: z.string(),
@@ -448,6 +395,7 @@ const GmailToolkitErrorSchema = z.object({
   field: z.string().optional(),
 });
 /**
- *
+ * Serialised error DTO returned inside MCP tool results when an operation fails.
+ * Carries HTTP status code, message, operation label, retryability flag, and optional field name.
  */
 export type GmailToolkitError = z.infer<typeof GmailToolkitErrorSchema>;

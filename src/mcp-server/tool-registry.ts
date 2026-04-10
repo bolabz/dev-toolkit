@@ -14,12 +14,15 @@
 // ---------------------------------------------------------------------------
 
 /**
- *
+ * Risk category for an MCP tool.
+ * - `read` — safe, no side effects
+ * - `write` — modifies state but reversible
+ * - `destructive` — irreversible (send, trash, permanent delete)
  */
 export type ToolCategory = 'read' | 'write' | 'destructive';
 
 /**
- *
+ * Configuration record for a single MCP tool entry in the registry.
  */
 export interface ToolConfig {
   readonly enabled: boolean;
@@ -28,7 +31,7 @@ export interface ToolConfig {
 }
 
 /**
- *
+ * Union of every tool name string registered in {@link DEFAULT_TOOL_REGISTRY}.
  */
 export type ToolName = keyof typeof DEFAULT_TOOL_REGISTRY;
 
@@ -226,4 +229,9 @@ function parseToolList(envVar: string | undefined): string[] {
     .filter((s) => s !== '');
 }
 
+/**
+ * Default tool registry: maps every tool name to its category, description, and default
+ * enabled/disabled state. Destructive tools are disabled by default and must be explicitly
+ * opted in via `GMAIL_ENABLE_TOOLS` or by setting `enabled: true` here.
+ */
 export { DEFAULT_TOOL_REGISTRY };
