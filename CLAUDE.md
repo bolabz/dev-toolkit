@@ -13,6 +13,7 @@ npm run setup-auth   # Optional pre-auth script
 # Build & Check
 npm run build        # Clean + compile TypeScript → dist/ (uses tsconfig.build.json)
 npm run typecheck    # Type check only, no emit (uses tsconfig.json)
+npm run deps:check   # Layer boundary + circular dependency validation
 npm run clean        # Remove dist/, coverage/, docs/typedoc/
 
 # Formatting & Linting
@@ -60,7 +61,8 @@ npm run ci           # Build + full test suite
 - **Prettier** (`.prettierrc`): Code formatting — single quotes, trailing commas, 100 char width
 - **ESLint** (`eslint.config.js`): Flat config — strict TypeScript, JSDoc enforcement, `no-console` (logger.ts exempt), `max-lines` (400 code-lines, skipBlankLines/skipComments)
 - **TypeDoc** (`typedoc.json`): API documentation generation with strict validation
-- **Lefthook** (`lefthook.yml`): Git hooks — pre-commit (prettier + eslint), pre-push (typecheck + docs + tests), commit-msg (commitlint)
+- **dependency-cruiser** (`.dependency-cruiser.cjs`): Layer boundary enforcement + architecture diagrams — `deps:check` validates, `deps:diagram` generates SVG
+- **Lefthook** (`lefthook.yml`): Git hooks — pre-commit (prettier + eslint), pre-push (full test suite), commit-msg (commitlint)
 - **Commitlint** (`commitlint.config.js`): Conventional commit message enforcement
 - **TypeScript**: Split config — `tsconfig.json` (check, noEmit) + `tsconfig.build.json` (emit, declarations)
 

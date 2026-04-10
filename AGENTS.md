@@ -26,7 +26,7 @@
 ## Codebase-Specific Conventions
 
 - Keep stdout clean for MCP protocol: use `logger` from `src/logger.ts` (stderr-only). Do not add `console.log`.
-- Preserve the layer boundary: put Gmail API call mechanics in `src/client/*`, orchestration/aggregation in `src/composed/*`, transport wiring in `src/mcp-server/`.
+- Preserve the layer boundary: put Gmail API call mechanics in `src/client/*`, orchestration/aggregation in `src/composed/*`, transport wiring in `src/mcp-server/`. Layer boundaries are enforced by dependency-cruiser (`.dependency-cruiser.cjs`). Run `npm run deps:check` to validate. The tool catches both direct and transitive violations, including type-only imports.
 - `src/types.ts` uses Zod schemas as canonical contracts (types + runtime validation shape); keep response field naming consistent (snake_case in public outputs).
 - MCP tool enablement is config-driven via `DEFAULT_TOOL_REGISTRY` in `src/mcp-server/tool-registry.ts` plus env overrides (`GMAIL_ENABLE_TOOLS`, `GMAIL_DISABLE_TOOLS`). The registry has 20 tools total: 15 enabled by default (7 read + 8 write), 5 destructive disabled.
 - Destructive tools (`gmail_send_*`, `gmail_trash_*`, `gmail_delete_draft`) are disabled by default; keep this safety posture unless explicitly requested. `gmail_delete_label` and `gmail_delete_filter` are in the `write` category and **are** enabled by default.
