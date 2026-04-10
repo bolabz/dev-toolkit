@@ -332,9 +332,7 @@ export async function transformMessage(
  * @param payload - The Gmail message payload to inspect for attachments
  * @returns An array of attachment metadata (id, filename, MIME type, size)
  */
-export function extractAttachments(
-  payload: gmail_v1.Schema$MessagePart | undefined,
-): AttachmentInfo[] {
+function extractAttachments(payload: gmail_v1.Schema$MessagePart | undefined): AttachmentInfo[] {
   const attachments: AttachmentInfo[] = [];
   if (!payload) {
     return attachments;

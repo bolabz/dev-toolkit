@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreBinaries": ["dot"],
+  "ignore": ["scripts/debug-raw-api.ts"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreIssues": {
+    "src/composed/body-processing.ts": ["exports"]
+  }
+}
