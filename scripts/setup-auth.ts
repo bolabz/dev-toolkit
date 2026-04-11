@@ -18,12 +18,12 @@ const log = logger.child('setup');
 const credentialsPath = process.argv[2] ?? './credentials.json';
 const tokenPath = process.argv[3] ?? './token.json';
 
-log.info('Gmail Toolkit — Authentication Setup');
-log.info(`Credentials: ${credentialsPath}`);
-log.info(`Token will be saved to: ${tokenPath}`);
+log.debug('Gmail Toolkit — Authentication Setup');
+log.debug(`Credentials: ${credentialsPath}`);
+log.debug(`Token will be saved to: ${tokenPath}`);
 
 try {
-  await ensureAuthenticated(credentialsPath, tokenPath);
+  await ensureAuthenticated(credentialsPath, tokenPath, { interactive: true });
   log.info('Setup complete! Gmail Toolkit is ready to use.');
   log.info('Next steps:');
   log.info('  Library:  import { GmailToolkit } from "gmail-toolkit"');

@@ -19,6 +19,19 @@ export type AccountOverview = z.infer<typeof AccountOverviewSchema>;
 // @public
 export type AttachmentInfo = z.infer<typeof AttachmentInfoSchema>;
 
+// @public
+export class AuthenticationRequiredError extends Error {
+    constructor(tokenPath: string, expired: boolean);
+}
+
+// @public
+export interface AuthOptions {
+    interactive?: boolean;
+}
+
+// @public
+export function beginAuthFlow(credentialsPath: string, tokenPath: string): PendingAuth;
+
 // Warning: (ae-forgotten-export) The symbol "ContactSchema" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -53,7 +66,7 @@ export type DraftDetail = z.infer<typeof DraftDetailSchema>;
 export type DraftSummary = z.infer<typeof DraftSummarySchema>;
 
 // @public
-export function ensureAuthenticated(credentialsPath: string, tokenPath: string): Promise<OAuth2Client>;
+export function ensureAuthenticated(credentialsPath: string, tokenPath: string, options?: AuthOptions): Promise<OAuth2Client>;
 
 // Warning: (ae-forgotten-export) The symbol "FilterActionsSchema" needs to be exported by the entry point index.d.ts
 //
@@ -229,10 +242,21 @@ export type LabelOverview = z.infer<typeof LabelOverviewSchema>;
 // @public
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
 
+// @public
+export class MissingCredentialsError extends Error {
+    constructor(resolvedPath: string);
+}
+
 // Warning: (ae-forgotten-export) The symbol "ModifyResultSchema" needs to be exported by the entry point index.d.ts
 //
 // @public
 export type ModifyResult = z.infer<typeof ModifyResultSchema>;
+
+// @public
+export interface PendingAuth {
+    readonly completed: Promise<void>;
+    readonly url: string;
+}
 
 // @public
 export function resolveToolRegistry(): Record<ToolName, ToolConfig>;

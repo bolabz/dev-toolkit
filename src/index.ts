@@ -440,7 +440,13 @@ export class GmailToolkit {
 
 export { createGmailContext } from './composed/index.js';
 export type { GmailContext } from './composed/context.js';
-export { ensureAuthenticated } from './auth.js';
+export {
+  ensureAuthenticated,
+  beginAuthFlow,
+  MissingCredentialsError,
+  AuthenticationRequiredError,
+} from './auth.js';
+export type { AuthOptions, PendingAuth } from './auth.js';
 export {
   resolveToolRegistry,
   getEnabledTools,

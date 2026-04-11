@@ -47,6 +47,37 @@ interface InstalledCredentials {
 }
 
 // ---------------------------------------------------------------------------
+// Options
+// ---------------------------------------------------------------------------
+
+/** Options for {@link ensureAuthenticated}. */
+export interface AuthOptions {
+  /**
+   * Allow interactive browser-based OAuth consent flow.
+   * When `false` (default), throws {@link AuthenticationRequiredError} if no valid
+   * token is available. When `true`, opens a browser for Google sign-in.
+   *
+   * Only `setup-auth` should set this to `true`.
+   */
+  interactive?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Public Types
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of {@link beginAuthFlow} — provides the OAuth URL for the user and
+ * a promise that resolves when the user completes browser consent.
+ */
+export interface PendingAuth {
+  /** Google OAuth consent URL for the user to visit. */
+  readonly url: string;
+  /** Resolves when the user completes consent and the token is saved to disk. */
+  readonly completed: Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -54,22 +85,28 @@ interface InstalledCredentials {
  * Ensures we have a valid, authenticated OAuth2 client.
  *
  * Auth state machine:
- *   1. No credentials.json → throw with step-by-step setup instructions + open browser
+ *   1. No credentials.json → throw with step-by-step setup instructions
  *   2. Token exists, refresh valid → silent auto-refresh (invisible, ~100ms)
- *   3. Token exists, refresh invalid → launch browser flow
- *   4. No token.json → launch browser flow
+ *   3. Token exists, refresh invalid → throw (or launch browser if interactive)
+ *   4. No token.json → throw (or launch browser if interactive)
  * @param credentialsPath - Path to Google OAuth credentials.json
  * @param tokenPath - Path to stored token.json (created automatically on first auth)
+ * @param options - Authentication options (interactive mode, etc.)
  * @returns Authenticated OAuth2Client ready for Gmail API calls
  */
 export async function ensureAuthenticated(
   credentialsPath: string,
   tokenPath: string,
+  options: AuthOptions = {},
 ): Promise<OAuth2Client> {
+  const { interactive = false } = options;
+
   // 1. credentials.json MUST exist — cannot be auto-generated
   const resolvedCredPath = path.resolve(credentialsPath);
   if (!fs.existsSync(resolvedCredPath)) {
-    await openCredentialsConsole();
+    if (interactive) {
+      await openCredentialsConsole();
+    }
     throw new MissingCredentialsError(resolvedCredPath);
   }
 
@@ -88,6 +125,9 @@ export async function ensureAuthenticated(
       return oauth2;
     } catch (err: unknown) {
       if (isInvalidGrant(err)) {
+        if (!interactive) {
+          throw new AuthenticationRequiredError(resolvedTokenPath, true);
+        }
         log.warn('Saved authorization has expired. Re-authenticating...');
         // Fall through to browser flow
       } else {
@@ -96,8 +136,54 @@ export async function ensureAuthenticated(
     }
   }
 
-  // 3. No valid token — launch interactive browser flow
+  // 3. No valid token — require interactive mode for browser flow
+  if (!interactive) {
+    throw new AuthenticationRequiredError(resolvedTokenPath, false);
+  }
+
   return await browserAuthFlow(oauth2, resolvedTokenPath);
+}
+
+/**
+ * Start a headless OAuth flow without opening a browser.
+ *
+ * Returns the consent URL immediately (for the caller to surface to the user)
+ * and a promise that resolves once the user completes browser consent and the
+ * token is persisted to disk. Used by the MCP server to provide self-service
+ * authentication through tool responses.
+ * @param credentialsPath - Path to Google OAuth credentials.json
+ * @param tokenPath - Path where the OAuth token will be stored
+ * @returns The OAuth URL and a completion promise
+ */
+export function beginAuthFlow(credentialsPath: string, tokenPath: string): PendingAuth {
+  const resolvedCredPath = path.resolve(credentialsPath);
+  if (!fs.existsSync(resolvedCredPath)) {
+    throw new MissingCredentialsError(resolvedCredPath);
+  }
+
+  const oauth2 = createOAuth2Client(resolvedCredPath);
+  const resolvedTokenPath = path.resolve(tokenPath);
+
+  const url = oauth2.generateAuthUrl({
+    access_type: 'offline',
+    scope: SCOPES,
+    prompt: 'consent',
+  });
+
+  const completed = (async () => {
+    const code = await waitForRedirect();
+    const { tokens } = await oauth2.getToken(code);
+    oauth2.setCredentials(tokens);
+
+    const tokenDir = path.dirname(resolvedTokenPath);
+    if (!fs.existsSync(tokenDir)) {
+      fs.mkdirSync(tokenDir, { recursive: true });
+    }
+    fs.writeFileSync(resolvedTokenPath, JSON.stringify(tokens, null, 2));
+    log.info('Authentication successful. Token saved.');
+  })();
+
+  return { url, completed };
 }
 
 // ---------------------------------------------------------------------------
@@ -248,10 +334,15 @@ function authResultPage(success: boolean, message: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Missing Credentials Error
+// Auth Errors
 // ---------------------------------------------------------------------------
 
-class MissingCredentialsError extends Error {
+/** Thrown when credentials.json is not found at the expected path. */
+export class MissingCredentialsError extends Error {
+  /**
+   * Create a MissingCredentialsError with setup instructions.
+   * @param resolvedPath - The absolute path where credentials.json was expected
+   */
   constructor(resolvedPath: string) {
     super(
       `\n` +
@@ -281,6 +372,38 @@ class MissingCredentialsError extends Error {
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
     );
     this.name = 'MissingCredentialsError';
+  }
+}
+
+/** Thrown when a valid OAuth token is required but not available (missing or expired). */
+export class AuthenticationRequiredError extends Error {
+  /**
+   * Create an AuthenticationRequiredError with setup instructions.
+   * @param tokenPath - The absolute path where token.json was expected
+   * @param expired - Whether an existing token was found but is expired/revoked
+   */
+  constructor(tokenPath: string, expired: boolean) {
+    const reason = expired
+      ? 'Saved authorization has expired or been revoked.'
+      : `No OAuth token found at: ${tokenPath}`;
+    super(
+      `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  Gmail Toolkit: Authentication required\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        `  ${reason}\n` +
+        `\n` +
+        `  Run the setup script to ${expired ? 're-' : ''}authenticate:\n` +
+        `\n` +
+        `    npm run setup-auth\n` +
+        `\n` +
+        `  This opens your browser for Google sign-in and saves\n` +
+        `  the token for future use.\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
+    );
+    this.name = 'AuthenticationRequiredError';
   }
 }
 
