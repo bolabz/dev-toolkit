@@ -25,6 +25,8 @@
   "treatWarningsAsErrors": true,
   "treatValidationWarningsAsErrors": true,
   "requiredToBeDocumented": [
+    "Constructor",
+    "Accessor",
     "Enum",
     "EnumMember",
     "Variable",
