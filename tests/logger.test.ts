@@ -5,11 +5,11 @@
  * env-var configuration, and stderr-only output.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { Logger } from '../src/logger.js';
 
 describe('Logger', () => {
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: MockInstance;
 
   beforeEach(() => {
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

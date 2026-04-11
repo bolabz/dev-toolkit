@@ -43,13 +43,16 @@ export const MessageSummarySchema = z.object({
   to: z.array(ContactSchema),
   cc: z.array(ContactSchema),
   subject: z.string(),
-  date: z.string(), // ISO 8601
+  date: z.string(), // ISO 8601 — derived from internalDate (Gmail receipt time, not sender Date header)
   snippet: z.string(),
   labels: z.array(z.string()),
   is_unread: z.boolean(),
   is_starred: z.boolean(),
+  is_mailing_list: z.boolean(),
   has_attachments: z.boolean(),
+  reply_to: ContactSchema.nullable(),
   size_bytes: z.number(),
+  history_id: z.string(),
   web_url: z.string(),
   body_text: z.string().nullable().optional(),
 });
@@ -94,15 +97,18 @@ export const FullMessageSchema = z.object({
   to: z.array(ContactSchema),
   cc: z.array(ContactSchema),
   bcc: z.array(ContactSchema),
+  reply_to: ContactSchema.nullable(),
   subject: z.string(),
-  date: z.string(), // ISO 8601
+  date: z.string(), // ISO 8601 — derived from internalDate (Gmail receipt time, not sender Date header)
   labels: z.array(z.string()),
   is_unread: z.boolean(),
   is_starred: z.boolean(),
+  is_mailing_list: z.boolean(),
   body_text: z.string(),
   body_html: z.string().nullable(),
   attachments: z.array(AttachmentInfoSchema),
   size_bytes: z.number(),
+  history_id: z.string(),
   web_url: z.string(),
 });
 /**
@@ -162,7 +168,8 @@ export const LabelDetailSchema = z.object({
       background: z.string(),
     })
     .nullable(),
-  visibility: z.string(),
+  label_list_visibility: z.string(),
+  message_list_visibility: z.string(),
 });
 /** Complete label definition including message/thread counts, color, and visibility settings. */
 export type LabelDetail = z.infer<typeof LabelDetailSchema>;
@@ -298,7 +305,10 @@ export const AccountOverviewSchema = z.object({
       email: z.string(),
       display_name: z.string(),
       is_default: z.boolean(),
+      is_primary: z.boolean(),
       reply_to: z.string().nullable(),
+      signature_html: z.string().nullable(),
+      signature_text: z.string().nullable(),
     }),
   ),
   delegates: z.array(
@@ -307,8 +317,16 @@ export const AccountOverviewSchema = z.object({
       status: z.string(),
     }),
   ),
-  imap_enabled: z.boolean(),
-  pop_enabled: z.boolean(),
+  imap: z.object({
+    enabled: z.boolean(),
+    auto_expunge: z.boolean(),
+    expunge_behavior: z.string(),
+  }),
+  pop: z.object({
+    enabled: z.boolean(),
+    access_window: z.string(),
+    disposition: z.string(),
+  }),
 });
 /**
  * Gmail account overview: profile counters, vacation responder, forwarding,
@@ -376,6 +394,52 @@ export const SendResultSchema = z.object({
  * human-readable confirmation.
  */
 export type SendResult = z.infer<typeof SendResultSchema>;
+
+// ---------------------------------------------------------------------------
+// Thread Search
+// ---------------------------------------------------------------------------
+
+/** Zod schema for a lightweight thread row returned in thread search results. */
+export const ThreadSummarySchema = z.object({
+  id: z.string(),
+  snippet: z.string(),
+  history_id: z.string(),
+});
+/** Lightweight thread row from a search — use readThread() to fetch full details. */
+export type ThreadSummary = z.infer<typeof ThreadSummarySchema>;
+
+/** Zod schema for a paginated thread search result. */
+export const ThreadSearchResultSchema = z.object({
+  total_estimate: z.number(),
+  returned: z.number(),
+  next_page_token: z.string().nullable(),
+  threads: z.array(ThreadSummarySchema),
+});
+/** Paginated thread search result with lightweight thread rows and paging metadata. */
+export type ThreadSearchResult = z.infer<typeof ThreadSearchResultSchema>;
+
+// ---------------------------------------------------------------------------
+// History
+// ---------------------------------------------------------------------------
+
+/** Zod schema for a single mailbox change event from the history API. */
+export const HistoryEventSchema = z.object({
+  history_id: z.string(),
+  message_id: z.string().nullable(),
+  type: z.enum(['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved']),
+  label_ids: z.array(z.string()),
+});
+/** A single mailbox change event: what happened, to which message, and which labels changed. */
+export type HistoryEvent = z.infer<typeof HistoryEventSchema>;
+
+/** Zod schema for the result of polling mailbox history since a given history ID. */
+export const HistoryResultSchema = z.object({
+  current_history_id: z.string(),
+  next_page_token: z.string().nullable(),
+  events: z.array(HistoryEventSchema),
+});
+/** Incremental sync result: change events since the requested history ID and the new watermark. */
+export type HistoryResult = z.infer<typeof HistoryResultSchema>;
 
 // ---------------------------------------------------------------------------
 // Error (MCP response DTO)

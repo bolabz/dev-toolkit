@@ -30,6 +30,8 @@ import {
   deleteDraft,
   sendDraft,
   sendMessage,
+  searchThreads,
+  getHistory,
 } from './composed/index.js';
 import type {
   SearchResult,
@@ -47,6 +49,8 @@ import type {
   SendResult,
   DeleteLabelResult,
   DeleteFilterResult,
+  ThreadSearchResult,
+  HistoryResult,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -395,6 +399,39 @@ export class GmailToolkit {
   }): Promise<SendResult> {
     return sendMessage(this.context.client, options);
   }
+
+  /**
+   * Search Gmail threads matching a query.
+   * Returns lightweight summaries — use readThread() for full message details.
+   * @param query - Gmail search query string (e.g. 'is:unread label:finance')
+   * @param maxResults - Maximum number of thread results to return
+   * @param pageToken - Pagination token from a previous searchThreads call
+   * @returns Paginated thread summaries with snippet and history ID
+   */
+  async searchThreads(
+    query: string,
+    maxResults?: number,
+    pageToken?: string,
+  ): Promise<ThreadSearchResult> {
+    return searchThreads(this.context.client, query, maxResults, pageToken);
+  }
+
+  /**
+   * Get mailbox change events since a given history ID (incremental sync).
+   * Use the historyId from a previous getAccount(), readMessage(), or search() call
+   * as the watermark. Pair messageAdded events with readMessage() for efficient polling.
+   * @param sinceHistoryId - The history ID to start from (exclusive)
+   * @param maxResults - Maximum number of history records per page (default 100)
+   * @param pageToken - Pagination token from a previous getHistory call
+   * @returns Change events and the new history ID watermark for the next poll
+   */
+  async getHistory(
+    sinceHistoryId: string,
+    maxResults?: number,
+    pageToken?: string,
+  ): Promise<HistoryResult> {
+    return getHistory(this.context.client, sinceHistoryId, maxResults, pageToken);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -432,5 +469,9 @@ export type {
   DeleteLabelResult,
   DeleteFilterResult,
   SendResult,
+  ThreadSummary,
+  ThreadSearchResult,
+  HistoryEvent,
+  HistoryResult,
   GmailToolkitError,
 } from './types.js';

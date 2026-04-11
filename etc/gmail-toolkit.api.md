@@ -149,6 +149,7 @@ export class GmailToolkit {
     getAccount(): Promise<AccountOverview>;
     getDrafts(maxResults?: number, query?: string, includeBody?: boolean): Promise<DraftSummary>;
     getFilters(): Promise<FilterOverview>;
+    getHistory(sinceHistoryId: string, maxResults?: number, pageToken?: string): Promise<HistoryResult>;
     getLabels(): Promise<LabelOverview>;
     modifyMessages(messageIds: string[], options: {
         addLabels?: string[];
@@ -161,6 +162,7 @@ export class GmailToolkit {
     readMessage(messageId: string, includeHtml?: boolean): Promise<FullMessage>;
     readThread(threadId: string): Promise<FullThread>;
     search(query: string, maxResults?: number, pageToken?: string, includeBody?: boolean): Promise<SearchResult>;
+    searchThreads(query: string, maxResults?: number, pageToken?: string): Promise<ThreadSearchResult>;
     sendDraft(draftId: string): Promise<SendResult>;
     sendMessage(options: {
         to: string;
@@ -202,6 +204,16 @@ export class GmailValidationError extends Error {
     readonly operation: string;
 }
 
+// Warning: (ae-forgotten-export) The symbol "HistoryEventSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type HistoryEvent = z.infer<typeof HistoryEventSchema>;
+
+// Warning: (ae-forgotten-export) The symbol "HistoryResultSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type HistoryResult = z.infer<typeof HistoryResultSchema>;
+
 // Warning: (ae-forgotten-export) The symbol "LabelDetailSchema" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -239,6 +251,16 @@ export type SearchSummary = z.infer<typeof SearchSummarySchema>;
 //
 // @public
 export type SendResult = z.infer<typeof SendResultSchema>;
+
+// Warning: (ae-forgotten-export) The symbol "ThreadSearchResultSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type ThreadSearchResult = z.infer<typeof ThreadSearchResultSchema>;
+
+// Warning: (ae-forgotten-export) The symbol "ThreadSummarySchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type ThreadSummary = z.infer<typeof ThreadSummarySchema>;
 
 // (No @packageDocumentation comment for this package)
 

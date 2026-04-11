@@ -7,6 +7,7 @@
 import type { GmailClient } from '../client/index.js';
 import type { AccountOverview } from '../types.js';
 import { logger } from '../logger.js';
+import { convert as htmlToText } from 'html-to-text';
 
 const log = logger.child('composed:account');
 
@@ -56,17 +57,31 @@ export async function getAccount(client: GmailClient): Promise<AccountOverview> 
       email: fa.forwardingEmail ?? '',
       verified: fa.verificationStatus === 'accepted',
     })),
-    send_as_aliases: sendAs.map((sa) => ({
-      email: sa.sendAsEmail ?? '',
-      display_name: sa.displayName ?? '',
-      is_default: sa.isDefault ?? false,
-      reply_to: sa.replyToAddress ?? null,
-    })),
+    send_as_aliases: sendAs.map((sa) => {
+      const sigHtml = sa.signature != null && sa.signature !== '' ? sa.signature : null;
+      return {
+        email: sa.sendAsEmail ?? '',
+        display_name: sa.displayName ?? '',
+        is_default: sa.isDefault ?? false,
+        is_primary: sa.isPrimary ?? false,
+        reply_to: sa.replyToAddress != null && sa.replyToAddress !== '' ? sa.replyToAddress : null,
+        signature_html: sigHtml,
+        signature_text: sigHtml != null ? htmlToText(sigHtml, { wordwrap: false }) : null,
+      };
+    }),
     delegates: delegates.map((d) => ({
       email: d.delegateEmail ?? '',
       status: d.verificationStatus ?? 'unknown',
     })),
-    imap_enabled: imap.enabled ?? false,
-    pop_enabled: pop.accessWindow !== 'disabled',
+    imap: {
+      enabled: imap.enabled ?? false,
+      auto_expunge: imap.autoExpunge ?? true,
+      expunge_behavior: imap.expungeBehavior ?? '',
+    },
+    pop: {
+      enabled: pop.accessWindow !== 'disabled',
+      access_window: pop.accessWindow ?? 'disabled',
+      disposition: pop.disposition ?? '',
+    },
   };
 }

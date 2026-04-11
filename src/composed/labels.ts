@@ -31,7 +31,8 @@ function toDetail(label: gmail_v1.Schema$Label, detailed?: gmail_v1.Schema$Label
     color: source.color
       ? { text: source.color.textColor ?? '', background: source.color.backgroundColor ?? '' }
       : null,
-    visibility: source.labelListVisibility ?? 'labelShow',
+    label_list_visibility: source.labelListVisibility ?? 'labelShow',
+    message_list_visibility: source.messageListVisibility ?? 'show',
   };
 }
 
@@ -39,9 +40,12 @@ function toDetail(label: gmail_v1.Schema$Label, detailed?: gmail_v1.Schema$Label
 // Composed Label Operations
 // ---------------------------------------------------------------------------
 
+// System labels worth fetching counts for (most visible in Gmail UI)
+const SYSTEM_LABELS_WITH_COUNTS = new Set(['INBOX', 'SENT', 'TRASH', 'SPAM', 'DRAFT']);
+
 /**
  * Get comprehensive label overview with counts.
- * Fetches individual counts only for user labels (not system labels).
+ * Fetches individual counts for user labels and key system labels (INBOX, SENT, TRASH, SPAM, DRAFT).
  * @param client - The authenticated Gmail API client
  * @param labelCache - The label name-to-ID resolution cache
  * @returns A comprehensive overview of all labels with counts and summaries
@@ -72,33 +76,39 @@ export async function getLabels(
     { systemLabels: [], userLabels: [], categories: [] },
   );
 
-  // Fetch accurate counts for user labels only (batched)
+  // Fetch accurate counts for user labels (batched)
   const userLabelIds = userLabels.map((l) => l.id ?? '').filter((id) => id !== '');
   const detailedUserLabels =
     userLabelIds.length > 0 ? await client.labels.batchGet(userLabelIds) : [];
-
-  // Map detailed user labels by ID for easy lookup
   const detailedMap = new Map(detailedUserLabels.map((l) => [l.id, l]));
+
+  // Also fetch counts for key system labels (INBOX, SENT, TRASH, SPAM, DRAFT)
+  const systemIdsForCounts = systemLabels
+    .map((l) => l.id ?? '')
+    .filter((id) => id !== '' && SYSTEM_LABELS_WITH_COUNTS.has(id));
+  const detailedSystemLabels =
+    systemIdsForCounts.length > 0 ? await client.labels.batchGet(systemIdsForCounts) : [];
+  const systemDetailMap = new Map(detailedSystemLabels.map((l) => [l.id, l]));
 
   const userLabelDetails = userLabels.map((l) => toDetail(l, detailedMap.get(l.id)));
   const emptyLabels = userLabelDetails.filter((l) => l.messages_total === 0).map((l) => l.name);
-  const mostActive = userLabelDetails.reduce(
-    (max, l) => (l.messages_total > max.messages_total ? l : max),
-    userLabelDetails[0],
-  );
+  const mostActive =
+    userLabelDetails.length > 0
+      ? userLabelDetails.reduce((max, l) => (l.messages_total > max.messages_total ? l : max))
+      : null;
 
   // Refresh cache since we just fetched all labels
   labelCache.invalidate();
   log.debug('Label cache refreshed after getLabels()');
 
   return {
-    system_labels: systemLabels.map((l) => toDetail(l)),
+    system_labels: systemLabels.map((l) => toDetail(l, systemDetailMap.get(l.id))),
     user_labels: userLabelDetails,
     categories: categories.map((l) => toDetail(l)),
     summary: {
       total_user_labels: userLabelDetails.length,
       empty_labels: emptyLabels,
-      most_active: mostActive.name,
+      most_active: mostActive?.name ?? '',
     },
   };
 }

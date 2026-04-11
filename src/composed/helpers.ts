@@ -10,6 +10,7 @@ import type { Contact, FullMessage, AttachmentInfo } from '../types.js';
 import type { LabelCache } from './label-cache.js';
 import { processMessagePayload } from './body-processing.js';
 import { logger } from '../logger.js';
+import he from 'he';
 
 const log = logger.child('composed:helpers');
 
@@ -76,8 +77,22 @@ export function parseContactList(raw: string): Contact[] {
 }
 
 /**
+ * Decode HTML entities and strip invisible Unicode spacers from email snippets.
+ * ESPs embed zero-width characters (U+034F, U+200B–U+200F, etc.) as tracking
+ * spacers in plain-text snippets. These degrade downstream text processing.
+ * @param raw - The raw snippet string from the Gmail API
+ * @returns Cleaned, human-readable snippet text
+ */
+export function cleanSnippet(raw: string): string {
+  return he
+    .decode(raw)
+    .replace(/[\u034f\u00ad\u200b-\u200f\u2028\u2029\ufeff\u2060]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Construct a Gmail web UI URL for a given message.
- * Uses #all/ to work regardless of which label the message is under.
  * @param messageId - The Gmail message ID to link to
  * @returns The full Gmail web UI URL for the message
  */
@@ -302,6 +317,16 @@ export async function transformMessage(
     options,
   );
 
+  // Prefer Gmail's internalDate (set on receipt) over the sender Date header
+  const date =
+    raw.internalDate != null
+      ? new Date(Number(raw.internalDate)).toISOString()
+      : parseDate(headers.get('Date') ?? '');
+
+  // Reply-To overrides From for replies (mailing lists, no-reply senders, etc.)
+  const replyToRaw = headers.get('Reply-To');
+  const replyTo = replyToRaw != null && replyToRaw !== '' ? parseContact(replyToRaw) : null;
+
   return {
     id: raw.id ?? '',
     thread_id: raw.threadId ?? '',
@@ -309,15 +334,18 @@ export async function transformMessage(
     to: parseContactList(headers.get('To') ?? ''),
     cc: parseContactList(headers.get('Cc') ?? ''),
     bcc: parseContactList(headers.get('Bcc') ?? ''),
+    reply_to: replyTo,
     subject: headers.get('Subject') ?? '(no subject)',
-    date: parseDate(headers.get('Date') ?? ''),
+    date,
     labels: resolvedLabels,
     is_unread: labelIds.includes('UNREAD'),
     is_starred: labelIds.includes('STARRED'),
+    is_mailing_list: headers.has('List-Unsubscribe'),
     body_text: text,
     body_html: html,
     attachments: extractAttachments(raw.payload),
     size_bytes: raw.sizeEstimate ?? 0,
+    history_id: raw.historyId ?? '',
     web_url: gmailWebUrl(raw.id ?? ''),
   };
 }

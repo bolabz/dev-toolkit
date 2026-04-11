@@ -16,6 +16,7 @@ import {
   formatLabelChanges,
   buildRfc2822Message,
   transformMessage,
+  cleanSnippet,
 } from './helpers.js';
 import { processMessagePayload } from './body-processing.js';
 import type {
@@ -25,12 +26,11 @@ import type {
   ModifyResult,
   SendResult,
 } from '../types.js';
-import he from 'he';
 import { logger } from '../logger.js';
 
 const log = logger.child('composed:messages');
 
-const METADATA_HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date'];
+const METADATA_HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date', 'Reply-To', 'List-Unsubscribe'];
 
 // ---------------------------------------------------------------------------
 // Search
@@ -90,6 +90,7 @@ export async function search(
     const resolvedLabels = await labelCache.resolve(labelIds);
     const isUnread = labelIds.includes('UNREAD');
     const isStarred = labelIds.includes('STARRED');
+    const isMailingList = msgHeaders.has('List-Unsubscribe');
 
     if (isUnread) unreadCount++;
 
@@ -112,6 +113,15 @@ export async function search(
       bodyText = text;
     }
 
+    // Prefer Gmail's internalDate (receipt time) over the sender Date header
+    const date =
+      raw.internalDate != null
+        ? new Date(Number(raw.internalDate)).toISOString()
+        : parseDate(msgHeaders.get('Date') ?? '');
+
+    const replyToRaw = msgHeaders.get('Reply-To');
+    const replyTo = replyToRaw != null && replyToRaw !== '' ? parseContact(replyToRaw) : null;
+
     messages.push({
       id: raw.id ?? '',
       thread_id: raw.threadId ?? '',
@@ -119,13 +129,16 @@ export async function search(
       to: parseContactList(msgHeaders.get('To') ?? ''),
       cc: parseContactList(msgHeaders.get('Cc') ?? ''),
       subject: msgHeaders.get('Subject') ?? '(no subject)',
-      date: parseDate(msgHeaders.get('Date') ?? ''),
-      snippet: he.decode(raw.snippet ?? ''),
+      date,
+      snippet: cleanSnippet(raw.snippet ?? ''),
       labels: resolvedLabels,
       is_unread: isUnread,
       is_starred: isStarred,
+      is_mailing_list: isMailingList,
       has_attachments: hasAttachments(raw.payload, raw.sizeEstimate),
+      reply_to: replyTo,
       size_bytes: raw.sizeEstimate ?? 0,
+      history_id: raw.historyId ?? '',
       web_url: gmailWebUrl(raw.id ?? ''),
       body_text: bodyText,
     });
