@@ -191,9 +191,9 @@ export function resolveToolRegistry(): Record<ToolName, ToolConfig> {
  * Returns only the tools that are currently enabled.
  * @returns An array of [name, config] pairs for enabled tools
  */
-export function getEnabledTools(): Array<[ToolName, ToolConfig]> {
+export function getEnabledTools(): [ToolName, ToolConfig][] {
   const registry = resolveToolRegistry();
-  return (Object.entries(registry) as Array<[ToolName, ToolConfig]>).filter(
+  return (Object.entries(registry) as [ToolName, ToolConfig][]).filter(
     ([, config]) => config.enabled,
   );
 }
@@ -204,7 +204,7 @@ export function getEnabledTools(): Array<[ToolName, ToolConfig]> {
  */
 export function getToolsByCategory(): Record<ToolCategory, ToolName[]> {
   const registry = resolveToolRegistry();
-  return (Object.entries(registry) as Array<[ToolName, ToolConfig]>).reduce<
+  return (Object.entries(registry) as [ToolName, ToolConfig][]).reduce<
     Record<ToolCategory, ToolName[]>
   >(
     (acc, [name, config]) => {

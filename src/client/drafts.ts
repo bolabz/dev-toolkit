@@ -19,7 +19,7 @@ export class DraftsClient extends GmailClientBase {
    * @returns Draft ID/message pairs with pagination metadata
    */
   async list(options: { maxResults?: number; pageToken?: string; query?: string } = {}): Promise<{
-    drafts: Array<{ id: string; messageId: string }>;
+    drafts: { id: string; messageId: string }[];
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }> {

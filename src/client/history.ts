@@ -10,7 +10,7 @@ import { GmailClientBase } from './base.js';
 /** Options for listing mailbox history changes. */
 export interface ListHistoryOptions {
   startHistoryId: string;
-  historyTypes?: Array<'messageAdded' | 'messageDeleted' | 'labelAdded' | 'labelRemoved'>;
+  historyTypes?: ('messageAdded' | 'messageDeleted' | 'labelAdded' | 'labelRemoved')[];
   labelId?: string;
   maxResults?: number;
   pageToken?: string;
