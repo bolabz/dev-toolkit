@@ -17,14 +17,14 @@
   },
   "messages": {
     "compilerMessageReporting": {
-      "default": { "logLevel": "warning" }
+      "default": { "logLevel": "error" }
     },
     "extractorMessageReporting": {
-      "default": { "logLevel": "warning" },
+      "default": { "logLevel": "error" },
       "ae-missing-release-tag": { "logLevel": "none" }
     },
     "tsdocMessageReporting": {
-      "default": { "logLevel": "warning" },
+      "default": { "logLevel": "error" },
       "tsdoc-param-tag-with-invalid-name": { "logLevel": "none" }
     }
   }
