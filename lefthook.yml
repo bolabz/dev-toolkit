@@ -22,7 +22,7 @@ pre-commit:
     eslint:
       priority: 2
       glob: "**/*.{ts,tsx}"
-      run: npx eslint --fix {staged_files}
+      run: npx eslint --max-warnings 0 --fix {staged_files}
       stage_fixed: true
       fail_text: "ESLint check failed. Run `npm run lint:fix` to fix."
 
@@ -30,6 +30,7 @@ pre-push:
   commands:
     test:
       run: npm run test
+      timeout: 300
       fail_text: "Quality checks failed. Run `npm run test` to see errors."
 
 commit-msg:
