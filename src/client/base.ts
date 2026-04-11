@@ -56,7 +56,7 @@ export abstract class GmailClientBase {
    */
   protected async execute<T>(fn: () => Promise<T>, operation = 'unknown'): Promise<T> {
     try {
-      return (await this.queue.add(fn, { throwOnTimeout: true })) as T;
+      return (await this.queue.add(fn)) as T;
     } catch (err) {
       // Pass through errors that already carry full context.
       if (err instanceof GmailApiError || err instanceof GmailValidationError) throw err;
