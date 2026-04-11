@@ -4,85 +4,51 @@ Three-layer TypeScript toolkit for Gmail management: standalone library + MCP se
 
 ## Commands
 
+`@package.json` scripts for development, testing, building, and documentation generation:
+
 ```bash
 # Development
-npm run dev          # Dev mode MCP server (tsx, no build needed)
-npm run start        # Production MCP server (requires build)
-npm run setup-auth   # Optional pre-auth script
-
-# Build & Check
-npm run build        # Clean + compile TypeScript → dist/ (uses tsconfig.build.json)
-npm run typecheck    # Type check only, no emit (uses tsconfig.json)
-npm run deps:check   # Layer boundary + circular dependency validation
-npm run knip         # Dead code and unused dependency detection
-npm run clean        # Remove dist/, coverage/, docs/typedoc/
-
-# Formatting & Linting
-npm run prettier:check   # Check Prettier compliance
-npm run prettier:write   # Auto-format with Prettier
-npm run lint:check       # ESLint with zero warnings allowed
-npm run lint:fix         # ESLint with auto-fix
-npm run format:check     # Prettier + ESLint check (combined)
-npm run format:fix       # Prettier + ESLint fix (combined)
-
+npm run dev           # Dev mode MCP server (tsx, no build needed)
+npm run start         # Production MCP server (built, node)
+npm run fix           # Auto-fix formatting and lint issues
+npm run check         # Check all code quality (formatting, lint, types)
 # Testing
-npm run test         # Full suite: typecheck + format:check + docs:check + deps:check + knip + test:unit
-npm run test:unit    # Vitest unit tests only
-npm run test:coverage # Unit tests with coverage report
-npm run test:watch   # Vitest in watch mode
-
+npm run test           # Run test suite (vitest)
+npm run test:watch     # Run tests in watch mode
+# Build & Check
+npm run build         # Compile TypeScript and generate API report
+npm run ci            # Full CI pipeline: build + API check + tests
 # Documentation
-npm run docs         # Generate TypeDoc API docs → docs/typedoc/
-npm run docs:check   # Validate TypeDoc without emitting
-
-# API Surface
-npm run api:check    # Verify public API surface (requires build)
-npm run api:update   # Regenerate API report after intentional changes
-
-# CI
-npm run ci           # Build + API check + full test suite
+npm run docs          # Generate API documentation (TypeDoc)
 ```
 
 ## Architecture
 
-- **Layer 1** (`src/client/`): 1:1 Gmail API v1 wrapper with rate limiting, batching, pagination
-- **Layer 2** (`src/composed/`): Aggregated operations with label resolution, body processing, analytics
-- **Layer 3** (`src/mcp-server.ts` + `src/mcp-server/`): MCP server with domain-based tool modules, resources, and prompts (20 tools: 15 enabled, 5 destructive/disabled)
+- **Layer 1** (`@src/client/`): 1:1 Gmail API v1 wrapper with rate limiting, batching, pagination
+- **Layer 2** (`@src/composed/`): Aggregated operations with label resolution, body processing, analytics
+- **Layer 3** (`@src/mcp-server.ts` + `@src/mcp-server/`): MCP server with domain-based tool modules, resources, and prompts (20 tools: 15 enabled, 5 destructive/disabled)
 - **Auth** (`src/auth.ts`): Seamless OAuth2 — auto-refreshes tokens, opens browser on first use
 - **Logger** (`src/logger.ts`): Singleton logger — all output to stderr, env-var controlled (`GMAIL_LOG_LEVEL`)
 - **Types** (`src/types.ts`): Zod schemas serving as TypeScript types + runtime validation + MCP schemas
+- `@src/index.ts` — Library entry point (`GmailToolkit` class)
 
-## Key Files
+## Documentation
 
-- `docs/Gmail_Toolkit_Project_Spec.md` — Full architecture spec (source of truth)
-- `docs/Gmail_API_Complete_Reference.md` — Gmail API endpoint reference
-- `docs/known-gaps.md` — Tracked limitations and planned improvements
-- `src/index.ts` — Library entry point (`GmailToolkit` class)
-- `src/mcp-server.ts` — MCP server entry point (orchestrator)
-- `src/mcp-server/tool-registry.ts` — Tool configuration and enable/disable registry
-- `src/logger.ts` — Logger singleton with child loggers
+- `@docs/architecture.mermaid` — Visual architecture diagram (Mermaid source)
+- `@docs/gmail-toolkit.api.md` — Generated API report (public types and functions) from API Extractor
 
 ## Dev Tooling
 
-- **Prettier** (`.prettierrc`): Code formatting — single quotes, trailing commas, 100 char width
-- **ESLint** (`eslint.config.js`): Flat config — strict TypeScript, JSDoc enforcement, `no-console` (logger.ts exempt), `max-lines` (400 code-lines, skipBlankLines/skipComments)
-- **TypeDoc** (`typedoc.json`): API documentation generation with strict validation
-- **dependency-cruiser** (`.dependency-cruiser.cjs`): Layer boundary enforcement + architecture diagrams — `deps:check` validates, `deps:diagram` generates SVG
-- **Lefthook** (`lefthook.yml`): Git hooks — pre-commit (prettier + eslint), pre-push (full test suite), commit-msg (commitlint)
-- **Knip** (`knip.json`): Dead code, unused exports, and unused dependency detection
-- **Changesets** (`.changeset/`): Version management and changelog generation
-- **API Extractor** (`api-extractor.json`): Public API surface diffing — `etc/gmail-toolkit.api.md` is the committed report
-- **Commitlint** (`commitlint.config.js`): Conventional commit message enforcement
-- **TypeScript**: Split config — `tsconfig.json` (check, noEmit) + `tsconfig.build.json` (emit, declarations)
-
-## Auth
-
-Requires `credentials.json` from Google Cloud Console (gitignored). On first run, opens browser for OAuth consent and saves `token.json`. See spec Section 3 for setup steps.
+- **Prettier** (`@.prettierrc`): Code formatting — single quotes, trailing commas, 100 char width
+- **ESLint** (`@eslint.config.js`): Flat config — strict TypeScript, JSDoc enforcement, `no-console` (logger.ts exempt), `max-lines` (400 code-lines, skipBlankLines/skipComments)
+- **TypeDoc** (`@typedoc.json`): API documentation generation with strict validation
+- **dependency-cruiser** (`@.dependency-cruiser.cjs`): Layer boundary enforcement + architecture diagrams
+- **Lefthook** (`@lefthook.yml`): Git hooks — pre-commit (prettier + eslint), pre-push (full test suite), commit-msg (commitlint)
+- **Knip** (`@knip.json`): Dead code, unused exports, and unused dependency detection
+- **API Extractor** (`@api-extractor.json`): Public API surface diffing
+- **Commitlint** (`@commitlint.config.js`): Conventional commit message enforcement
+- **TypeScript**: Split config — `@tsconfig.json` (check, noEmit) + `@tsconfig.build.json` (emit, declarations)
 
 ## Testing
 
 45 test stubs (`it.todo()`) + 18 passing logger tests. Test infrastructure (vitest) is configured and working. Coverage via `npm run test:coverage` (v8 provider).
-
-## Known Gaps
-
-See `docs/known-gaps.md` for full details including Layer 2 coverage audit and implementation guidance.

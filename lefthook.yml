@@ -7,6 +7,10 @@ output:
   - failure
   - execution_out
 
+# ── Pre-commit ────────────────────────────────────────────────────────
+# Fast fix/check for cleanliness — format + lint staged files only.
+# Doc generation happens at build time, validated at push time.
+
 pre-commit:
   piped: true
   skip:
@@ -18,7 +22,7 @@ pre-commit:
       glob: "**/*.{ts,tsx,js,json,md,yml,yaml}"
       run: npx prettier --write {staged_files}
       stage_fixed: true
-      fail_text: "Prettier formatting failed. Run `npm run prettier:write` to fix."
+      fail_text: "Prettier formatting failed. Run `npm run prettier:fix` to fix."
     eslint:
       priority: 2
       glob: "**/*.{ts,tsx}"
@@ -26,12 +30,21 @@ pre-commit:
       stage_fixed: true
       fail_text: "ESLint check failed. Run `npm run lint:fix` to fix."
 
+# ── Pre-push ──────────────────────────────────────────────────────────
+# Pre-flight check mirroring the CI pipeline.
+# Piped: compile first (dist/ needed for api:check), then validate.
+
 pre-push:
+  piped: true
   commands:
-    test:
-      run: npm run test
-      timeout: "30s"
-      fail_text: "Quality checks failed. Run `npm run test` to see errors."
+    ci:
+      priority: 1
+      run: npm run ci
+      timeout: "60s"
+      fail_text: "Quality checks failed. Run `npm run ci` to see errors."
+
+# ── Commit-msg ────────────────────────────────────────────────────────
+# Enforce conventional commits with required scope and body.
 
 commit-msg:
   commands:
