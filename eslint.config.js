@@ -9,7 +9,11 @@ export default tseslint.config(
   },
   {
     files: ['**/*.ts', '**/*.tsx'],
-    extends: [eslint.configs.recommended, tseslint.configs.strictTypeChecked],
+    extends: [
+      eslint.configs.recommended,
+      tseslint.configs.strictTypeChecked,
+      tseslint.configs.stylisticTypeChecked,
+    ],
     linterOptions: {
       reportUnusedDisableDirectives: 'error',
     },
@@ -24,7 +28,7 @@ export default tseslint.config(
         'error',
         {
           prefer: 'type-imports',
-          disallowTypeAnnotations: false,
+          disallowTypeAnnotations: true,
         },
       ],
       '@typescript-eslint/no-unused-vars': [
@@ -52,16 +56,22 @@ export default tseslint.config(
       ],
       '@typescript-eslint/no-import-type-side-effects': 'error',
       '@typescript-eslint/method-signature-style': ['error', 'property'],
+      // Zod forces type aliases; codebase uses both type and interface intentionally
+      '@typescript-eslint/consistent-type-definitions': 'off',
+      '@typescript-eslint/no-useless-empty-export': 'error',
 
       // --- Strictness ---
       'no-console': 'error',
       '@typescript-eslint/strict-boolean-expressions': 'error',
       '@typescript-eslint/prefer-readonly': 'error',
       '@typescript-eslint/require-array-sort-compare': 'error',
-      'no-param-reassign': ['error', { props: false }],
+      'no-param-reassign': ['error', { props: true, ignorePropertyModificationsFor: [] }],
       'no-return-assign': 'error',
       curly: ['error', 'all'],
       'max-lines': ['error', { max: 400, skipBlankLines: true, skipComments: true }],
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+      'no-implicit-coercion': 'error',
+      'no-lonely-if': 'error',
 
       // --- Safety ---
       '@typescript-eslint/no-shadow': 'error',
@@ -90,6 +100,15 @@ export default tseslint.config(
     files: ['src/logger.ts'],
     rules: {
       'no-console': ['error', { allow: ['error'] }],
+    },
+  },
+  // Test files: allow empty functions (used in vi.spyOn().mockImplementation(() => {}))
+  // and no-console (tests may assert on console output)
+  {
+    files: ['tests/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-empty-function': 'off',
+      'no-console': 'off',
     },
   },
   // JSDoc enforcement for TypeScript files
