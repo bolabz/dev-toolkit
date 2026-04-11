@@ -9,7 +9,7 @@ import { z } from 'zod';
 import type { GmailContext } from '../composed/context.js';
 import { getFilters, createFilter, deleteFilter } from '../composed/index.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
-import { toMcpError } from './utils.js';
+import { toMcpError, toMcpResult } from './utils.js';
 
 /**
  * Register all filter-related MCP tools.
@@ -30,7 +30,7 @@ export function registerFilterTools(
       async () => {
         try {
           const result = await getFilters(client, labelCache);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_get_filters');
         }
@@ -50,7 +50,10 @@ export function registerFilterTools(
               to: z.string().optional(),
               subject: z.string().optional(),
               query: z.string().optional(),
+              negated_query: z.string().optional(),
               has_attachment: z.boolean().optional(),
+              size: z.number().optional(),
+              size_comparison: z.enum(['smaller', 'larger']).optional(),
             })
             .describe('Filter matching criteria'),
           actions: z
@@ -67,7 +70,7 @@ export function registerFilterTools(
       async ({ criteria, actions }) => {
         try {
           const result = await createFilter(client, labelCache, criteria, actions);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_create_filter');
         }
@@ -87,7 +90,7 @@ export function registerFilterTools(
       async ({ filter_id }) => {
         try {
           const result = await deleteFilter(client, filter_id);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_delete_filter');
         }

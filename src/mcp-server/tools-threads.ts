@@ -9,7 +9,7 @@ import { z } from 'zod';
 import type { GmailContext } from '../composed/context.js';
 import { readThread, modifyThread, trashThread, searchThreads } from '../composed/index.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
-import { toMcpError } from './utils.js';
+import { toMcpError, toMcpResult } from './utils.js';
 
 /**
  * Register all thread-related MCP tools.
@@ -35,7 +35,7 @@ export function registerThreadTools(
       async ({ thread_id }) => {
         try {
           const result = await readThread(client, labelCache, thread_id);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_read_thread');
         }
@@ -63,7 +63,7 @@ export function registerThreadTools(
             add_labels,
             remove_labels,
           );
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_modify_thread');
         }
@@ -83,7 +83,7 @@ export function registerThreadTools(
       async ({ thread_id }) => {
         try {
           const result = await trashThread(client, thread_id);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_trash_thread');
         }
@@ -100,12 +100,18 @@ export function registerThreadTools(
           query: z.string().describe('Gmail search query (e.g., "is:unread label:finance")'),
           max_results: z.number().optional().describe('Max threads to return (default 20)'),
           page_token: z.string().optional().describe('Pagination token from previous search'),
+          enrich: z
+            .boolean()
+            .optional()
+            .describe(
+              'Fetch message counts, subjects, and participants per thread (default false). Adds one API call per thread.',
+            ),
         },
       },
-      async ({ query, max_results, page_token }) => {
+      async ({ query, max_results, page_token, enrich }) => {
         try {
-          const result = await searchThreads(client, query, max_results, page_token);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          const result = await searchThreads(client, query, max_results, page_token, enrich);
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_search_threads');
         }

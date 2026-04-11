@@ -78,6 +78,11 @@ export type FilterActions = z.infer<typeof FilterActionsSchema>;
 // @public
 export type FilterCriteria = z.infer<typeof FilterCriteriaSchema>;
 
+// Warning: (ae-forgotten-export) The symbol "FilterCriteriaInputSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type FilterCriteriaInput = z.infer<typeof FilterCriteriaInputSchema>;
+
 // Warning: (ae-forgotten-export) The symbol "FilterDetailSchema" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -175,7 +180,12 @@ export class GmailToolkit {
     readMessage(messageId: string, includeHtml?: boolean): Promise<FullMessage>;
     readThread(threadId: string): Promise<FullThread>;
     search(query: string, maxResults?: number, pageToken?: string, includeBody?: boolean): Promise<SearchResult>;
-    searchThreads(query: string, maxResults?: number, pageToken?: string): Promise<ThreadSearchResult>;
+    searchAndModify(query: string, options: {
+        addLabels?: string[];
+        removeLabels?: string[];
+        maxMessages?: number;
+    }): Promise<ModifyResult>;
+    searchThreads(query: string, maxResults?: number, pageToken?: string, enrich?: boolean): Promise<ThreadSearchResult>;
     sendDraft(draftId: string): Promise<SendResult>;
     sendMessage(options: {
         to: string;

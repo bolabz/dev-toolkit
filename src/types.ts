@@ -67,6 +67,7 @@ export const SearchSummarySchema = z.object({
   unread_count: z.number(),
   senders: z.record(z.string(), z.number()),
   labels: z.record(z.string(), z.number()),
+  thread_message_counts: z.record(z.string(), z.number()),
 });
 /**
  * Aggregate analytics computed from a set of search results:
@@ -81,6 +82,7 @@ export const SearchResultSchema = z.object({
   next_page_token: z.string().nullable(),
   messages: z.array(MessageSummarySchema),
   summary: SearchSummarySchema,
+  related_queries: z.array(z.string()),
 });
 /** Complete paginated search result: message rows, paging token, and summary analytics. */
 export type SearchResult = z.infer<typeof SearchResultSchema>;
@@ -224,22 +226,37 @@ export type DraftSummary = z.infer<typeof DraftSummarySchema>;
 // Filters
 // ---------------------------------------------------------------------------
 
-/** Zod schema for Gmail filter match criteria. */
+/** Zod schema for Gmail filter match criteria (output shape — only set fields are present). */
 export const FilterCriteriaSchema = z.object({
-  from: z.string().nullable(),
-  to: z.string().nullable(),
-  subject: z.string().nullable(),
-  query: z.string().nullable(),
-  negated_query: z.string().nullable(),
-  has_attachment: z.boolean().nullable(),
-  size: z.number().nullable(),
-  size_comparison: z.enum(['smaller', 'larger']).nullable(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  subject: z.string().optional(),
+  query: z.string().optional(),
+  negated_query: z.string().optional(),
+  has_attachment: z.boolean().optional(),
+  size: z.number().optional(),
+  size_comparison: z.enum(['smaller', 'larger']).optional(),
 });
 /**
  * Criteria that determine which incoming messages a Gmail filter matches
  * (sender, recipient, subject, query, size, attachment presence, etc.).
+ * Only set fields are present — unused criteria are omitted rather than null.
  */
 export type FilterCriteria = z.infer<typeof FilterCriteriaSchema>;
+
+/** Zod schema for filter criteria input params (shared by search, create filter, and modify). */
+export const FilterCriteriaInputSchema = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+  subject: z.string().optional(),
+  query: z.string().optional(),
+  negated_query: z.string().optional(),
+  has_attachment: z.boolean().optional(),
+  size: z.number().optional(),
+  size_comparison: z.enum(['smaller', 'larger']).optional(),
+});
+/** Input criteria for searching, filtering, or modifying messages by structured fields. */
+export type FilterCriteriaInput = z.infer<typeof FilterCriteriaInputSchema>;
 
 /** Zod schema for the actions applied when a Gmail filter matches a message. */
 export const FilterActionsSchema = z.object({
@@ -404,8 +421,14 @@ export const ThreadSummarySchema = z.object({
   id: z.string(),
   snippet: z.string(),
   history_id: z.string(),
+  // Enrichment fields (present only when enrich=true)
+  message_count: z.number().optional(),
+  subject: z.string().optional(),
+  participants: z.array(ContactSchema).optional(),
+  has_unread: z.boolean().optional(),
+  date_range: z.object({ first: z.string(), last: z.string() }).optional(),
 });
-/** Lightweight thread row from a search — use readThread() to fetch full details. */
+/** Lightweight thread row from a search — use readThread() for full details. Enrichment fields present when enrich=true. */
 export type ThreadSummary = z.infer<typeof ThreadSummarySchema>;
 
 /** Zod schema for a paginated thread search result. */

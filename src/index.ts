@@ -20,6 +20,7 @@ import {
   createLabel,
   updateLabel,
   modifyMessages,
+  searchAndModify,
   modifyThread,
   createDraft,
   createFilter,
@@ -402,18 +403,44 @@ export class GmailToolkit {
 
   /**
    * Search Gmail threads matching a query.
-   * Returns lightweight summaries — use readThread() for full message details.
+   * Returns lightweight summaries by default. Set enrich=true for message counts,
+   * subjects, participants, unread status, and date ranges.
    * @param query - Gmail search query string (e.g. 'is:unread label:finance')
    * @param maxResults - Maximum number of thread results to return
    * @param pageToken - Pagination token from a previous searchThreads call
-   * @returns Paginated thread summaries with snippet and history ID
+   * @param enrich - Whether to fetch full thread metadata (default false)
+   * @returns Paginated thread summaries, optionally enriched
    */
   async searchThreads(
     query: string,
     maxResults?: number,
     pageToken?: string,
+    enrich?: boolean,
   ): Promise<ThreadSearchResult> {
-    return searchThreads(this.context.client, query, maxResults, pageToken);
+    return searchThreads(this.context.client, query, maxResults, pageToken, enrich);
+  }
+
+  /**
+   * Search for messages matching a query and modify their labels in one operation.
+   * @param query - Gmail search query string
+   * @param options - Labels to add/remove and safety cap
+   * @param options.addLabels - Label names to apply to matching messages
+   * @param options.removeLabels - Label names to remove from matching messages
+   * @param options.maxMessages - Maximum messages to modify (default 500)
+   * @returns A summary of modifications with any failed message IDs
+   */
+  async searchAndModify(
+    query: string,
+    options: { addLabels?: string[]; removeLabels?: string[]; maxMessages?: number },
+  ): Promise<ModifyResult> {
+    return searchAndModify(
+      this.context.client,
+      this.context.labelCache,
+      query,
+      options.addLabels,
+      options.removeLabels,
+      options.maxMessages,
+    );
   }
 
   /**
@@ -477,6 +504,7 @@ export type {
   SendResult,
   ThreadSummary,
   ThreadSearchResult,
+  FilterCriteriaInput,
   HistoryEvent,
   HistoryResult,
   GmailToolkitError,

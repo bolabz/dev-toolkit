@@ -5,7 +5,12 @@
 import type { gmail_v1 } from 'googleapis';
 import type { GmailClient } from '../client/index.js';
 import type { LabelCache } from './label-cache.js';
-import type { FilterOverview, FilterDetail, DeleteFilterResult } from '../types.js';
+import type {
+  FilterOverview,
+  FilterDetail,
+  DeleteFilterResult,
+  FilterCriteriaInput,
+} from '../types.js';
 import { logger } from '../logger.js';
 
 const log = logger.child('composed:filters');
@@ -22,14 +27,16 @@ function toFilterDetail(
   return {
     id: raw.id ?? '',
     criteria: {
-      from: raw.criteria?.from ?? null,
-      to: raw.criteria?.to ?? null,
-      subject: raw.criteria?.subject ?? null,
-      query: raw.criteria?.query ?? null,
-      negated_query: raw.criteria?.negatedQuery ?? null,
-      has_attachment: raw.criteria?.hasAttachment ?? null,
-      size: raw.criteria?.size ?? null,
-      size_comparison: (raw.criteria?.sizeComparison as 'smaller' | 'larger' | undefined) ?? null,
+      ...(raw.criteria?.from != null && { from: raw.criteria.from }),
+      ...(raw.criteria?.to != null && { to: raw.criteria.to }),
+      ...(raw.criteria?.subject != null && { subject: raw.criteria.subject }),
+      ...(raw.criteria?.query != null && { query: raw.criteria.query }),
+      ...(raw.criteria?.negatedQuery != null && { negated_query: raw.criteria.negatedQuery }),
+      ...(raw.criteria?.hasAttachment != null && { has_attachment: raw.criteria.hasAttachment }),
+      ...(raw.criteria?.size != null && { size: raw.criteria.size }),
+      ...(raw.criteria?.sizeComparison != null && {
+        size_comparison: raw.criteria.sizeComparison as 'smaller' | 'larger',
+      }),
     },
     actions: {
       add_labels: resolvedAddLabels,
@@ -39,6 +46,30 @@ function toFilterDetail(
       mark_read: (raw.action?.removeLabelIds ?? []).includes('UNREAD'),
     },
   };
+}
+
+/**
+ * Convert structured filter criteria to a Gmail search query string.
+ * @param criteria - The structured filter criteria input
+ * @returns A Gmail search query string combining all specified criteria
+ */
+export function filterCriteriaToQuery(criteria: FilterCriteriaInput): string {
+  const parts: string[] = [];
+
+  if (criteria.from != null && criteria.from !== '') parts.push(`from:${criteria.from}`);
+  if (criteria.to != null && criteria.to !== '') parts.push(`to:${criteria.to}`);
+  if (criteria.subject != null && criteria.subject !== '')
+    parts.push(`subject:${criteria.subject}`);
+  if (criteria.query != null && criteria.query !== '') parts.push(criteria.query);
+  if (criteria.negated_query != null && criteria.negated_query !== '') {
+    parts.push(`-(${criteria.negated_query})`);
+  }
+  if (criteria.has_attachment === true) parts.push('has:attachment');
+  if (criteria.size != null && criteria.size_comparison != null) {
+    parts.push(`${criteria.size_comparison}:${criteria.size}`);
+  }
+
+  return parts.join(' ');
 }
 
 /**
