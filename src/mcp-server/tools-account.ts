@@ -8,7 +8,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { GmailContext } from '../composed/context.js';
 import { getAccount } from '../composed/index.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
-import { toMcpError } from './utils.js';
+import { toMcpError, toMcpResult } from './utils.js';
 
 /**
  * Register account-related MCP tools.
@@ -28,7 +28,7 @@ export function registerAccountTools(
       async () => {
         try {
           const result = await getAccount(context.client);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_get_account');
         }

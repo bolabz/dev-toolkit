@@ -28,6 +28,34 @@ import type {
 } from '../types.js';
 import { logger } from '../logger.js';
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const FREEMAIL_DOMAINS = new Set([
+  'gmail.com',
+  'yahoo.com',
+  'hotmail.com',
+  'outlook.com',
+  'aol.com',
+]);
+
+const SYSTEM_LABELS = new Set([
+  'INBOX',
+  'SENT',
+  'DRAFT',
+  'STARRED',
+  'UNREAD',
+  'SPAM',
+  'TRASH',
+  'IMPORTANT',
+  'CATEGORY_PERSONAL',
+  'CATEGORY_SOCIAL',
+  'CATEGORY_PROMOTIONS',
+  'CATEGORY_UPDATES',
+  'CATEGORY_FORUMS',
+]);
+
 const log = logger.child('composed:messages');
 
 const METADATA_HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date', 'Reply-To', 'List-Unsubscribe'];
@@ -67,7 +95,8 @@ export async function search(
       returned: 0,
       next_page_token: listResult.nextPageToken,
       messages: [],
-      summary: { unread_count: 0, senders: {}, labels: {} },
+      summary: { unread_count: 0, senders: {}, labels: {}, thread_message_counts: {} },
+      related_queries: [],
     };
   }
 
@@ -81,6 +110,7 @@ export async function search(
   const messages: MessageSummary[] = [];
   const senderCounts: Record<string, number> = {};
   const labelCounts: Record<string, number> = {};
+  const senderDomains = new Set<string>();
   let unreadCount = 0;
 
   for (const raw of rawMessages) {
@@ -94,9 +124,11 @@ export async function search(
 
     if (isUnread) unreadCount++;
 
-    // Track sender counts
+    // Track sender counts and domains
     const senderKey = from.name ?? from.email;
     senderCounts[senderKey] = (senderCounts[senderKey] ?? 0) + 1;
+    const emailDomain = from.email.split('@')[1];
+    if (emailDomain) senderDomains.add(emailDomain.toLowerCase());
 
     // Track label counts
     for (const label of resolvedLabels) {
@@ -144,6 +176,23 @@ export async function search(
     });
   }
 
+  // Fetch total message count per thread (non-fatal on failure)
+  let threadMessageCounts: Record<string, number> = {};
+  const uniqueThreadIds = [...new Set(messages.map((m) => m.thread_id))];
+  if (uniqueThreadIds.length > 0) {
+    try {
+      const threads = await client.threads.batchGet(uniqueThreadIds, 'minimal');
+      for (const thread of threads) {
+        if (thread.id != null && thread.id !== '') {
+          threadMessageCounts[thread.id] = (thread.messages ?? []).length;
+        }
+      }
+    } catch (err) {
+      log.debug('Non-fatal: failed to fetch thread message counts, returning empty map', err);
+      threadMessageCounts = {};
+    }
+  }
+
   return {
     total_estimate: listResult.resultSizeEstimate,
     returned: messages.length,
@@ -153,7 +202,9 @@ export async function search(
       unread_count: unreadCount,
       senders: senderCounts,
       labels: labelCounts,
+      thread_message_counts: threadMessageCounts,
     },
+    related_queries: generateRelatedQueries(senderDomains, labelCounts, query),
   };
 }
 
@@ -307,4 +358,86 @@ export async function sendMessage(
     thread_id: result.threadId ?? null,
     message: `Email sent to ${options.to}. Subject: "${options.subject}".`,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Search and Modify
+// ---------------------------------------------------------------------------
+
+/**
+ * Search for messages matching a query and modify their labels in one operation.
+ * Paginates through results up to maxMessages, then applies label changes.
+ * @param client - The authenticated Gmail API client
+ * @param labelCache - The label name-to-ID resolution cache
+ * @param query - Gmail search query string
+ * @param addLabels - Label names to apply to matching messages
+ * @param removeLabels - Label names to remove from matching messages
+ * @param maxMessages - Safety cap on total messages to modify (default 500)
+ * @returns A summary of modifications with any failed message IDs
+ */
+export async function searchAndModify(
+  client: GmailClient,
+  labelCache: LabelCache,
+  query: string,
+  addLabels: string[] = [],
+  removeLabels: string[] = [],
+  maxMessages = 500,
+): Promise<ModifyResult> {
+  // Paginate through search results collecting message IDs
+  const allIds: string[] = [];
+  let pageToken: string | undefined;
+
+  while (allIds.length < maxMessages) {
+    const page = await client.messages.list({
+      query,
+      maxResults: Math.min(500, maxMessages - allIds.length),
+      pageToken,
+    });
+    for (const msg of page.messages) {
+      allIds.push(msg.id);
+      if (allIds.length >= maxMessages) break;
+    }
+    pageToken = page.nextPageToken ?? undefined;
+    if (pageToken === undefined) break;
+  }
+
+  if (allIds.length === 0) {
+    return { modified: 0, failed: [], message: 'No messages matched the query.' };
+  }
+
+  return modifyMessages(client, labelCache, allIds, addLabels, removeLabels);
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate broadening search query suggestions from search result data.
+ * @param senderDomains - Unique email domains seen across matched senders
+ * @param labelCounts - Label name to message count frequency map
+ * @param originalQuery - The original search query string for deduplication
+ * @returns Array of suggested Gmail search queries (max 5)
+ */
+function generateRelatedQueries(
+  senderDomains: Set<string>,
+  labelCounts: Record<string, number>,
+  originalQuery: string,
+): string[] {
+  const queries: string[] = [];
+  const lowerQuery = originalQuery.toLowerCase();
+
+  for (const domain of senderDomains) {
+    if (!FREEMAIL_DOMAINS.has(domain) && !lowerQuery.includes(domain)) {
+      queries.push(`from:@${domain}`);
+    }
+  }
+
+  for (const label of Object.keys(labelCounts)) {
+    if (!SYSTEM_LABELS.has(label) && !lowerQuery.includes(`label:${label.toLowerCase()}`)) {
+      queries.push(`label:${label.toLowerCase().replace(/\s+/g, '-')}`);
+    }
+  }
+
+  return queries.slice(0, 5);
 }

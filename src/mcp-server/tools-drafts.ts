@@ -9,7 +9,7 @@ import { z } from 'zod';
 import type { GmailContext } from '../composed/context.js';
 import { getDrafts, createDraft, deleteDraft, sendDraft } from '../composed/index.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
-import { toMcpError } from './utils.js';
+import { toMcpError, toMcpResult } from './utils.js';
 
 /**
  * Register all draft-related MCP tools.
@@ -40,7 +40,7 @@ export function registerDraftTools(
       async ({ max_results, query, include_body }) => {
         try {
           const result = await getDrafts(client, labelCache, max_results, query, include_body);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_get_drafts');
         }
@@ -77,7 +77,7 @@ export function registerDraftTools(
             contentType: params.content_type,
             threadId: params.thread_id,
           });
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_create_draft');
         }
@@ -97,7 +97,7 @@ export function registerDraftTools(
       async ({ draft_id }) => {
         try {
           const result = await deleteDraft(client, draft_id);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_delete_draft');
         }
@@ -117,7 +117,7 @@ export function registerDraftTools(
       async ({ draft_id }) => {
         try {
           const result = await sendDraft(client, draft_id);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_send_draft');
         }

@@ -12,6 +12,9 @@ import {
   formatLabelChanges,
   transformMessage,
   cleanSnippet,
+  parseContact,
+  parseContactList,
+  headerMap,
 } from './helpers.js';
 import type {
   FullMessage,
@@ -176,28 +179,99 @@ export async function trashThread(client: GmailClient, threadId: string): Promis
 
 /**
  * Search Gmail threads matching a query.
- * Returns lightweight summaries (id, snippet, history_id) — use readThread() for full details.
+ * Returns lightweight summaries by default. Set enrich=true for message counts,
+ * subjects, participants, unread status, and date ranges (adds N API calls).
  * @param client - The authenticated Gmail API client
  * @param query - Gmail search query string (e.g. 'is:unread label:finance')
  * @param maxResults - Maximum number of results to return (default 20)
  * @param pageToken - Pagination token from a previous searchThreads() call
- * @returns Paginated thread search results with snippet and history ID per thread
+ * @param enrich - Whether to fetch full thread metadata (default false)
+ * @returns Paginated thread search results, optionally enriched
  */
 export async function searchThreads(
   client: GmailClient,
   query: string,
   maxResults = 20,
   pageToken?: string,
+  enrich = false,
 ): Promise<ThreadSearchResult> {
   const raw = await client.threads.list({ query, maxResults, pageToken });
-  return {
-    total_estimate: raw.resultSizeEstimate,
-    returned: raw.threads.length,
-    next_page_token: raw.nextPageToken,
-    threads: raw.threads.map((t) => ({
-      id: t.id,
-      snippet: cleanSnippet(t.snippet),
-      history_id: t.historyId,
-    })),
-  };
+
+  if (!enrich || raw.threads.length === 0) {
+    return {
+      total_estimate: raw.resultSizeEstimate,
+      returned: raw.threads.length,
+      next_page_token: raw.nextPageToken,
+      threads: raw.threads.map((t) => ({
+        id: t.id,
+        snippet: cleanSnippet(t.snippet),
+        history_id: t.historyId,
+      })),
+    };
+  }
+
+  // Enriched path: batch-fetch thread metadata
+  try {
+    const ids = raw.threads.map((t) => t.id);
+    const enrichedThreads = await client.threads.batchGet(ids, 'metadata', [
+      'From',
+      'To',
+      'Cc',
+      'Subject',
+    ]);
+
+    // Build a lookup for enriched data keyed by thread ID
+    const enrichedMap = new Map(enrichedThreads.map((t) => [t.id ?? '', t]));
+
+    return {
+      total_estimate: raw.resultSizeEstimate,
+      returned: raw.threads.length,
+      next_page_token: raw.nextPageToken,
+      threads: raw.threads.map((t) => {
+        const enriched = enrichedMap.get(t.id);
+        if (enriched?.messages == null || enriched.messages.length === 0) {
+          return { id: t.id, snippet: cleanSnippet(t.snippet), history_id: t.historyId };
+        }
+
+        const msgs = enriched.messages;
+        const firstHeaders = headerMap(msgs[0]?.payload?.headers ?? []);
+        const allParticipants = msgs.flatMap((m) => {
+          const h = headerMap(m.payload?.headers ?? []);
+          return [
+            parseContact(h.get('From') ?? ''),
+            ...parseContactList(h.get('To') ?? ''),
+            ...parseContactList(h.get('Cc') ?? ''),
+          ];
+        });
+        const firstDate =
+          msgs[0]?.internalDate != null ? new Date(Number(msgs[0].internalDate)).toISOString() : '';
+        const lastMsg = msgs[msgs.length - 1];
+        const lastDate =
+          lastMsg.internalDate != null ? new Date(Number(lastMsg.internalDate)).toISOString() : '';
+
+        return {
+          id: t.id,
+          snippet: cleanSnippet(t.snippet),
+          history_id: t.historyId,
+          message_count: msgs.length,
+          subject: firstHeaders.get('Subject') ?? '(no subject)',
+          participants: deduplicateContacts(allParticipants),
+          has_unread: msgs.some((m) => (m.labelIds ?? []).includes('UNREAD')),
+          date_range: { first: firstDate, last: lastDate },
+        };
+      }),
+    };
+  } catch (err) {
+    log.debug('Non-fatal: failed to enrich thread search, falling back to lightweight', err);
+    return {
+      total_estimate: raw.resultSizeEstimate,
+      returned: raw.threads.length,
+      next_page_token: raw.nextPageToken,
+      threads: raw.threads.map((t) => ({
+        id: t.id,
+        snippet: cleanSnippet(t.snippet),
+        history_id: t.historyId,
+      })),
+    };
+  }
 }

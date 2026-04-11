@@ -9,7 +9,7 @@ import { z } from 'zod';
 import type { GmailContext } from '../composed/context.js';
 import { getLabels, createLabel, updateLabel, deleteLabel } from '../composed/index.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
-import { toMcpError } from './utils.js';
+import { toMcpError, toMcpResult } from './utils.js';
 
 /**
  * Register all label-related MCP tools.
@@ -30,7 +30,7 @@ export function registerLabelTools(
       async () => {
         try {
           const result = await getLabels(client, labelCache);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_get_labels');
         }
@@ -57,7 +57,7 @@ export function registerLabelTools(
       async ({ name, color }) => {
         try {
           const result = await createLabel(client, labelCache, name, { color });
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_create_label');
         }
@@ -85,7 +85,7 @@ export function registerLabelTools(
       async ({ label, new_name, color }) => {
         try {
           const result = await updateLabel(client, labelCache, label, { new_name, color });
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_update_label');
         }
@@ -105,7 +105,7 @@ export function registerLabelTools(
       async ({ label }) => {
         try {
           const result = await deleteLabel(client, labelCache, label);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_delete_label');
         }

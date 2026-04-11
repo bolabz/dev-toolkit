@@ -57,14 +57,40 @@ export class ThreadsClient extends GmailClientBase {
    * Get a full thread by ID with all messages.
    * @param id - The Gmail thread ID
    * @param format - Response format for messages in the thread
+   * @param metadataHeaders - Specific headers to include when using 'metadata' format
    * @returns The raw Gmail API thread object with all messages
    */
-  async get(id: string, format: MessageFormat = 'full'): Promise<gmail_v1.Schema$Thread> {
+  async get(
+    id: string,
+    format: MessageFormat = 'full',
+    metadataHeaders?: string[],
+  ): Promise<gmail_v1.Schema$Thread> {
     const response = await this.execute(
-      () => this.gmail.users.threads.get({ userId: this.userId, id, format }),
+      () => this.gmail.users.threads.get({ userId: this.userId, id, format, metadataHeaders }),
       'threads.get',
     );
     return response.data;
+  }
+
+  /**
+   * Get multiple threads by ID (concurrent through rate limiter).
+   * @param ids - The Gmail thread IDs to fetch
+   * @param format - Response format for messages in each thread
+   * @param metadataHeaders - Specific headers to include when using 'metadata' format
+   * @returns The raw Gmail API thread objects
+   */
+  async batchGet(
+    ids: string[],
+    format: MessageFormat = 'minimal',
+    metadataHeaders?: string[],
+  ): Promise<gmail_v1.Schema$Thread[]> {
+    const fns = ids.map(
+      (id) => () =>
+        this.gmail.users.threads
+          .get({ userId: this.userId, id, format, metadataHeaders })
+          .then((r) => r.data),
+    );
+    return this.batchExecute(fns, 'threads.batchGet');
   }
 
   /**

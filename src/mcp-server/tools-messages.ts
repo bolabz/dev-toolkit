@@ -11,12 +11,15 @@ import {
   search,
   readMessage,
   modifyMessages,
+  searchAndModify,
   trashMessages,
   sendMessage,
   getHistory,
+  filterCriteriaToQuery,
 } from '../composed/index.js';
+import type { FilterCriteriaInput } from '../types.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
-import { toMcpError } from './utils.js';
+import { toMcpError, toMcpResult } from './utils.js';
 
 /**
  * Register all message-related MCP tools.
@@ -36,7 +39,22 @@ export function registerMessageTools(
       {
         description: toolRegistry.gmail_search.description,
         inputSchema: {
-          query: z.string().describe('Gmail search query (e.g., "is:unread from:chase")'),
+          query: z
+            .string()
+            .optional()
+            .describe(
+              'Gmail search query (e.g., "is:unread from:chase"). Combined with structured criteria if both provided.',
+            ),
+          from: z.string().optional().describe('Filter by sender email or name'),
+          to: z.string().optional().describe('Filter by recipient'),
+          subject: z.string().optional().describe('Filter by subject'),
+          has_attachment: z.boolean().optional().describe('Filter for messages with attachments'),
+          negated_query: z.string().optional().describe('Exclude messages matching this query'),
+          size: z.number().optional().describe('Size threshold in bytes'),
+          size_comparison: z
+            .enum(['smaller', 'larger'])
+            .optional()
+            .describe('Match messages smaller or larger than size'),
           max_results: z.number().optional().describe('Max messages to return (default 20)'),
           page_token: z.string().optional().describe('Pagination token from previous search'),
           include_body: z
@@ -47,17 +65,30 @@ export function registerMessageTools(
             ),
         },
       },
-      async ({ query, max_results, page_token, include_body }) => {
+      async (params) => {
         try {
+          // Build query from structured criteria + raw query
+          const criteria: FilterCriteriaInput = {
+            ...(params.from != null && { from: params.from }),
+            ...(params.to != null && { to: params.to }),
+            ...(params.subject != null && { subject: params.subject }),
+            ...(params.has_attachment != null && { has_attachment: params.has_attachment }),
+            ...(params.negated_query != null && { negated_query: params.negated_query }),
+            ...(params.size != null && { size: params.size }),
+            ...(params.size_comparison != null && { size_comparison: params.size_comparison }),
+          };
+          const criteriaQuery = filterCriteriaToQuery(criteria);
+          const combinedQuery = [params.query, criteriaQuery].filter(Boolean).join(' ');
+
           const result = await search(
             client,
             labelCache,
-            query,
-            max_results,
-            page_token,
-            include_body,
+            combinedQuery,
+            params.max_results,
+            params.page_token,
+            params.include_body,
           );
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_search');
         }
@@ -78,7 +109,7 @@ export function registerMessageTools(
       async ({ message_id, include_html }) => {
         try {
           const result = await readMessage(client, labelCache, message_id, include_html);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_read_message');
         }
@@ -92,21 +123,61 @@ export function registerMessageTools(
       {
         description: toolRegistry.gmail_modify_messages.description,
         inputSchema: {
-          message_ids: z.array(z.string()).describe('Message IDs to modify'),
+          message_ids: z
+            .array(z.string())
+            .optional()
+            .describe('Message IDs to modify (alternative to query-based mode)'),
+          query: z
+            .string()
+            .optional()
+            .describe('Gmail search query — modify all matching messages (alternative to IDs)'),
+          from: z.string().optional().describe('Filter by sender (query mode)'),
+          to: z.string().optional().describe('Filter by recipient (query mode)'),
+          subject: z.string().optional().describe('Filter by subject (query mode)'),
+          has_attachment: z
+            .boolean()
+            .optional()
+            .describe('Filter for messages with attachments (query mode)'),
+          max_messages: z
+            .number()
+            .optional()
+            .describe('Max messages to modify in query mode (default 500, safety cap)'),
           add_labels: z.array(z.string()).optional().describe('Label names to add'),
           remove_labels: z.array(z.string()).optional().describe('Label names to remove'),
         },
       },
-      async ({ message_ids, add_labels, remove_labels }) => {
+      async (params) => {
         try {
-          const result = await modifyMessages(
-            client,
-            labelCache,
-            message_ids,
-            add_labels,
-            remove_labels,
-          );
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          let result;
+          if (params.message_ids != null && params.message_ids.length > 0) {
+            // ID-based mode (existing behavior)
+            result = await modifyMessages(
+              client,
+              labelCache,
+              params.message_ids,
+              params.add_labels,
+              params.remove_labels,
+            );
+          } else {
+            // Query-based mode
+            const criteria: FilterCriteriaInput = {
+              ...(params.from != null && { from: params.from }),
+              ...(params.to != null && { to: params.to }),
+              ...(params.subject != null && { subject: params.subject }),
+              ...(params.has_attachment != null && { has_attachment: params.has_attachment }),
+            };
+            const criteriaQuery = filterCriteriaToQuery(criteria);
+            const combinedQuery = [params.query, criteriaQuery].filter(Boolean).join(' ');
+            result = await searchAndModify(
+              client,
+              labelCache,
+              combinedQuery,
+              params.add_labels,
+              params.remove_labels,
+              params.max_messages,
+            );
+          }
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_modify_messages');
         }
@@ -126,7 +197,7 @@ export function registerMessageTools(
       async ({ message_ids }) => {
         try {
           const result = await trashMessages(client, message_ids);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_trash_messages');
         }
@@ -160,7 +231,7 @@ export function registerMessageTools(
             contentType: params.content_type,
             threadId: params.thread_id,
           });
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_send_message');
         }
@@ -186,7 +257,7 @@ export function registerMessageTools(
       async ({ since_history_id, max_results, page_token }) => {
         try {
           const result = await getHistory(client, since_history_id, max_results, page_token);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+          return toMcpResult(result);
         } catch (err) {
           return toMcpError(err, 'gmail_get_history');
         }

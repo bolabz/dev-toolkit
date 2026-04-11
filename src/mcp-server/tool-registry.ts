@@ -45,7 +45,7 @@ const DEFAULT_TOOL_REGISTRY = {
     enabled: true,
     category: 'read' as const,
     description:
-      'Search messages by Gmail query. Set include_body=true to get processed body text inline (eliminates separate read calls).',
+      'Search messages by Gmail query string and/or structured filter criteria (from, to, subject, etc.). Set include_body=true to get processed body text inline.',
   },
   gmail_read_message: {
     enabled: true,
@@ -82,7 +82,7 @@ const DEFAULT_TOOL_REGISTRY = {
     enabled: true,
     category: 'read' as const,
     description:
-      'Search thread summaries by Gmail query. Returns id, snippet, and history_id per thread. Use gmail_read_thread for full details.',
+      'Search thread summaries by Gmail query. Set enrich=true for message counts, subjects, and participants. Use gmail_read_thread for full message bodies.',
   },
   gmail_get_history: {
     enabled: true,
@@ -105,7 +105,8 @@ const DEFAULT_TOOL_REGISTRY = {
   gmail_modify_messages: {
     enabled: true,
     category: 'write' as const,
-    description: 'Add/remove labels on messages (archive, star, mark read/unread, categorize)',
+    description:
+      'Add/remove labels on messages by ID or by search query. Use query mode to retroactively apply filter-like actions to existing messages.',
   },
   gmail_modify_thread: {
     enabled: true,
