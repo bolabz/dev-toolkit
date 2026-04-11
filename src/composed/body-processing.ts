@@ -5,7 +5,7 @@
  * Uses proven libraries for the hard problems, minimal custom code for the rest.
  *
  * Pipeline:
- *   1. MIME → text (mailparser + html-to-text)
+ *   1. MIME → text (postal-mime + html-to-text)
  *   2. Strip quoted reply chains (email-reply-parser)
  *   3. Strip standard signatures (RFC 3676 "-- \n" and "Sent from...")
  *   4. Remove CID image references
@@ -15,7 +15,7 @@
  */
 
 import { convert as htmlToText } from 'html-to-text';
-import { simpleParser, type ParsedMail } from 'mailparser';
+import PostalMime from 'postal-mime';
 import he from 'he';
 import { logger } from '../logger.js';
 
@@ -94,7 +94,7 @@ export async function processBody(
 ): Promise<{ text: string; html: string | null }> {
   const { stripReplies = true, includeHtml = false } = options;
 
-  const parsed = await simpleParser(
+  const parsed = await PostalMime.parse(
     typeof rawMessage === 'string'
       ? Buffer.from(rawMessage, 'base64url' as BufferEncoding)
       : rawMessage,
@@ -104,7 +104,7 @@ export async function processBody(
 
   return {
     text: await applyCleaningPipeline(rawText, stripReplies),
-    html: includeHtml && typeof parsed.html === 'string' ? parsed.html : null,
+    html: includeHtml && parsed.html != null ? parsed.html : null,
   };
 }
 
@@ -236,7 +236,7 @@ function stripResidualHtml(text: string): string {
   return text;
 }
 
-function extractText(parsed: ParsedMail): string {
+function extractText(parsed: { text?: string; html?: string }): string {
   if (typeof parsed.text === 'string' && parsed.text !== '') {
     return parsed.text;
   }
