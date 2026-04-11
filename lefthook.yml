@@ -30,7 +30,7 @@ pre-push:
   commands:
     test:
       run: npm run test
-      timeout: 300
+      timeout: "30s"
       fail_text: "Quality checks failed. Run `npm run test` to see errors."
 
 commit-msg:
@@ -46,3 +46,6 @@ commit-msg:
 
         Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
         Scope is required (e.g., auth, api, mcp). Use kebab-case for multi-word scopes.
+
+        Use two -m flags to guarantee the blank line on the command line:
+          git commit -m "type(scope): subject" -m "Explain why, not just what."
