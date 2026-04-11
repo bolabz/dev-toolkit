@@ -7,3 +7,4 @@ docs/typedoc
 lefthook.yml
 temp/
 .changeset/
+etc/
