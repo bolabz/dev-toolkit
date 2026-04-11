@@ -3,7 +3,7 @@
   "entry": ["src/index.ts"],
   "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
   "ignoreBinaries": ["dot"],
-  "ignore": ["scripts/debug-raw-api.ts"],
+  "ignore": ["scripts/debug-raw-api.ts", "scripts/live-test.ts"],
   "ignoreExportsUsedInFile": true,
   "ignoreIssues": {
     "src/composed/body-processing.ts": ["exports"]

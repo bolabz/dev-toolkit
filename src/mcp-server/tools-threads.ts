@@ -1,13 +1,13 @@
 /**
  * Gmail Toolkit — MCP Thread Tools
  *
- * Read, modify, and trash thread tools.
+ * Search, read, modify, and trash thread tools.
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { GmailContext } from '../composed/context.js';
-import { readThread, modifyThread, trashThread } from '../composed/index.js';
+import { readThread, modifyThread, trashThread, searchThreads } from '../composed/index.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
 import { toMcpError } from './utils.js';
 
@@ -86,6 +86,28 @@ export function registerThreadTools(
           return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         } catch (err) {
           return toMcpError(err, 'gmail_trash_thread');
+        }
+      },
+    );
+  }
+
+  if (toolRegistry.gmail_search_threads.enabled) {
+    server.registerTool(
+      'gmail_search_threads',
+      {
+        description: toolRegistry.gmail_search_threads.description,
+        inputSchema: {
+          query: z.string().describe('Gmail search query (e.g., "is:unread label:finance")'),
+          max_results: z.number().optional().describe('Max threads to return (default 20)'),
+          page_token: z.string().optional().describe('Pagination token from previous search'),
+        },
+      },
+      async ({ query, max_results, page_token }) => {
+        try {
+          const result = await searchThreads(client, query, max_results, page_token);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        } catch (err) {
+          return toMcpError(err, 'gmail_search_threads');
         }
       },
     );

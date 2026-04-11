@@ -234,7 +234,7 @@ function authResultPage(success: boolean, message: string): string {
   const icon = success ? '&#10003;' : '&#10007;';
   return `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head><title>Gmail Toolkit — Authorization</title></head>
     <body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #fafbfc;">
       <div style="text-align: center; padding: 2rem;">

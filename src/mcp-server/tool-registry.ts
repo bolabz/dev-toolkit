@@ -78,6 +78,18 @@ const DEFAULT_TOOL_REGISTRY = {
     description:
       'Get account overview: profile, vacation, forwarding, aliases, delegates, IMAP/POP',
   },
+  gmail_search_threads: {
+    enabled: true,
+    category: 'read' as const,
+    description:
+      'Search thread summaries by Gmail query. Returns id, snippet, and history_id per thread. Use gmail_read_thread for full details.',
+  },
+  gmail_get_history: {
+    enabled: true,
+    category: 'read' as const,
+    description:
+      'Get mailbox change events since a history ID (incremental sync). Pass history_id from a previous getAccount or readMessage call.',
+  },
 
   // === Non-destructive writes (enabled by default) ===
   gmail_create_label: {

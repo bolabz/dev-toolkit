@@ -13,6 +13,7 @@ import {
   modifyMessages,
   trashMessages,
   sendMessage,
+  getHistory,
 } from '../composed/index.js';
 import type { ToolName, ToolConfig } from './tool-registry.js';
 import { toMcpError } from './utils.js';
@@ -162,6 +163,32 @@ export function registerMessageTools(
           return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         } catch (err) {
           return toMcpError(err, 'gmail_send_message');
+        }
+      },
+    );
+  }
+
+  if (toolRegistry.gmail_get_history.enabled) {
+    server.registerTool(
+      'gmail_get_history',
+      {
+        description: toolRegistry.gmail_get_history.description,
+        inputSchema: {
+          since_history_id: z
+            .string()
+            .describe(
+              'History ID watermark to poll from — obtain from getAccount().history_id or readMessage().history_id',
+            ),
+          max_results: z.number().optional().describe('Max history records per page (default 100)'),
+          page_token: z.string().optional().describe('Pagination token from previous call'),
+        },
+      },
+      async ({ since_history_id, max_results, page_token }) => {
+        try {
+          const result = await getHistory(client, since_history_id, max_results, page_token);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        } catch (err) {
+          return toMcpError(err, 'gmail_get_history');
         }
       },
     );

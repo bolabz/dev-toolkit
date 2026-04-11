@@ -11,8 +11,15 @@ import {
   isUserLabel,
   formatLabelChanges,
   transformMessage,
+  cleanSnippet,
 } from './helpers.js';
-import type { FullMessage, FullThread, Contact, ModifyResult } from '../types.js';
+import type {
+  FullMessage,
+  FullThread,
+  Contact,
+  ModifyResult,
+  ThreadSearchResult,
+} from '../types.js';
 import { logger } from '../logger.js';
 
 const log = logger.child('composed:threads');
@@ -161,4 +168,36 @@ export async function trashThread(client: GmailClient, threadId: string): Promis
     log.debug(`Failed to trash thread ${threadId}`, err);
     return { modified: 0, failed: [threadId], message: `Failed to trash thread ${threadId}.` };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Search Threads
+// ---------------------------------------------------------------------------
+
+/**
+ * Search Gmail threads matching a query.
+ * Returns lightweight summaries (id, snippet, history_id) — use readThread() for full details.
+ * @param client - The authenticated Gmail API client
+ * @param query - Gmail search query string (e.g. 'is:unread label:finance')
+ * @param maxResults - Maximum number of results to return (default 20)
+ * @param pageToken - Pagination token from a previous searchThreads() call
+ * @returns Paginated thread search results with snippet and history ID per thread
+ */
+export async function searchThreads(
+  client: GmailClient,
+  query: string,
+  maxResults = 20,
+  pageToken?: string,
+): Promise<ThreadSearchResult> {
+  const raw = await client.threads.list({ query, maxResults, pageToken });
+  return {
+    total_estimate: raw.resultSizeEstimate,
+    returned: raw.threads.length,
+    next_page_token: raw.nextPageToken,
+    threads: raw.threads.map((t) => ({
+      id: t.id,
+      snippet: cleanSnippet(t.snippet),
+      history_id: t.historyId,
+    })),
+  };
 }
