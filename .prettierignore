@@ -4,6 +4,7 @@ coverage/
 *.log
 package-lock.json
 docs/typedoc
+docs/architecture.svg
 lefthook.yml
 temp/
 .changeset/

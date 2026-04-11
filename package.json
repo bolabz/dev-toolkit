@@ -31,6 +31,7 @@
     "clean": "rm -rf dist coverage docs/typedoc temp",
     "deps:check": "depcruise src --config .dependency-cruiser.cjs",
     "deps:diagram:mermaid": "npm run deps:check -- --output-type mermaid --output-to docs/architecture.mermaid",
+    "deps:diagram:svg": "mmdc -i docs/architecture.mermaid -o docs/architecture.svg",
     "knip": "knip",
     "knip:fix": "knip --fix",
     "test": "npm run typecheck && npm run format:check && npm run docs:check && npm run deps:check && npm run knip && npm run test:unit",
