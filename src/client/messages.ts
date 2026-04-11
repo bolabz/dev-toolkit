@@ -28,7 +28,7 @@ export class MessagesClient extends GmailClientBase {
    * @returns Matching message IDs with pagination metadata
    */
   async list(options: ListMessagesOptions = {}): Promise<{
-    messages: Array<{ id: string; threadId: string }>;
+    messages: { id: string; threadId: string }[];
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }> {

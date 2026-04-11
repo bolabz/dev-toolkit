@@ -12,7 +12,7 @@ const log = logger.child('mcp');
 
 /** Standard return shape for every MCP tool handler. */
 export type McpToolResult = {
-  content: Array<{ type: 'text'; text: string }>;
+  content: { type: 'text'; text: string }[];
   isError?: true;
 };
 

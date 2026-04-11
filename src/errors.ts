@@ -113,8 +113,8 @@ export class GmailValidationError extends Error {
 function extractHttpCode(err: unknown): number {
   if (err == null || typeof err !== 'object') return 0;
   const e = err as Record<string, unknown>;
-  if (typeof e['status'] === 'number' && e['status'] !== 0) return e['status'];
-  if (typeof e['code'] === 'number' && e['code'] !== 0) return e['code'];
+  if (typeof e.status === 'number' && e.status !== 0) return e.status;
+  if (typeof e.code === 'number' && e.code !== 0) return e.code;
   return 0;
 }
 
@@ -126,6 +126,6 @@ function extractHttpCode(err: unknown): number {
  */
 function isNetworkError(err: unknown): boolean {
   if (err == null || typeof err !== 'object') return false;
-  const code = (err as Record<string, unknown>)['code'];
+  const code = (err as Record<string, unknown>).code;
   return typeof code === 'string' && RETRYABLE_NETWORK_CODES.has(code);
 }

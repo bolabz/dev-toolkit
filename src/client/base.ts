@@ -76,10 +76,7 @@ export abstract class GmailClientBase {
    * @param operation - A label used in error messages for all items in the batch
    * @returns The resolved results of all API calls
    */
-  protected async batchExecute<T>(
-    fns: Array<() => Promise<T>>,
-    operation = 'unknown',
-  ): Promise<T[]> {
+  protected async batchExecute<T>(fns: (() => Promise<T>)[], operation = 'unknown'): Promise<T[]> {
     return Promise.all(fns.map((fn) => this.execute(fn, operation)));
   }
 

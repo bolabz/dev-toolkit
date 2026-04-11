@@ -126,7 +126,7 @@ export async function processMessagePayload(
   payload: {
     mimeType?: string | null;
     body?: { data?: string | null };
-    parts?: Array<{ mimeType?: string | null; body?: { data?: string | null }; parts?: unknown[] }>;
+    parts?: { mimeType?: string | null; body?: { data?: string | null }; parts?: unknown[] }[];
   },
   mimeType: string | undefined,
   options: { stripReplies?: boolean; includeHtml?: boolean } = {},
@@ -361,7 +361,7 @@ function findPart(
   payload: {
     mimeType?: string | null;
     body?: unknown;
-    parts?: Array<{ mimeType?: string | null; body?: unknown; parts?: unknown[] }>;
+    parts?: { mimeType?: string | null; body?: unknown; parts?: unknown[] }[];
   },
   targetMimeType: string,
 ): { body?: { data?: string | null } } | undefined {

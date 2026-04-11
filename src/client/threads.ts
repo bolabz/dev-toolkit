@@ -25,7 +25,7 @@ export class ThreadsClient extends GmailClientBase {
    * @returns Matching thread summaries with pagination metadata
    */
   async list(options: ListThreadsOptions = {}): Promise<{
-    threads: Array<{ id: string; snippet: string; historyId: string }>;
+    threads: { id: string; snippet: string; historyId: string }[];
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }> {

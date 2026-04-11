@@ -63,9 +63,7 @@ export async function readThread(
   }
 
   // Build label context: fetch counts for user labels on this thread
-  let labelContext:
-    | Array<{ name: string; messages_total: number; messages_unread: number }>
-    | undefined;
+  let labelContext: { name: string; messages_total: number; messages_unread: number }[] | undefined;
   if (includeLabelContext) {
     const userLabelIds = Array.from(allLabelIds).filter(isUserLabel);
     if (userLabelIds.length > 0) {
