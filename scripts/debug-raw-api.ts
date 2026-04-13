@@ -8,9 +8,9 @@
  * Usage: npx tsx scripts/debug-raw-api.ts
  */
 
-import { ensureAuthenticated } from '../src/auth.js';
+import { ensureAuthenticated } from '../src/shared/auth.js';
 import { GmailClient } from '../src/client/index.js';
-import { logger } from '../src/logger.js';
+import { logger } from '../src/shared/logger.js';
 import fs from 'node:fs';
 
 const log = logger.child('debug');

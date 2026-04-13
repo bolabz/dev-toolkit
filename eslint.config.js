@@ -97,7 +97,7 @@ export default tseslint.config(
   },
   // Logger is the one file allowed to use console.error (it IS the logging layer)
   {
-    files: ['src/logger.ts'],
+    files: ['src/shared/logger.ts'],
     rules: {
       'no-console': ['error', { allow: ['error'] }],
     },

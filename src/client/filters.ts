@@ -8,8 +8,23 @@
 import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase } from './base.js';
 
+/** Public contract for Gmail filter operations. */
+export interface IFiltersClient {
+  /** List all filters configured in the account. */
+  list: () => Promise<gmail_v1.Schema$Filter[]>;
+  /** Get a single filter by ID with its criteria and actions. */
+  get: (id: string) => Promise<gmail_v1.Schema$Filter>;
+  /** Create a new filter rule with matching criteria and automatic actions. */
+  create: (
+    criteria: gmail_v1.Schema$FilterCriteria,
+    action: gmail_v1.Schema$FilterAction,
+  ) => Promise<gmail_v1.Schema$Filter>;
+  /** Permanently delete a filter rule. */
+  delete: (id: string) => Promise<void>;
+}
+
 /** Client for Gmail settings.filters.* API endpoints with rate limiting. */
-export class FiltersClient extends GmailClientBase {
+export class FiltersClient extends GmailClientBase implements IFiltersClient {
   /**
    * List all filters configured in the account.
    * @returns All Gmail filter rules

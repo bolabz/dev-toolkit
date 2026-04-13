@@ -8,8 +8,32 @@
 import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase } from './base.js';
 
+/** Public contract for Gmail settings and profile operations. */
+export interface ISettingsClient {
+  /** Get the authenticated user's Gmail profile. */
+  getProfile: () => Promise<gmail_v1.Schema$Profile>;
+  /** Get the current vacation auto-reply settings. */
+  getVacation: () => Promise<gmail_v1.Schema$VacationSettings>;
+  /** Update the vacation auto-reply settings. */
+  updateVacation: (
+    settings: gmail_v1.Schema$VacationSettings,
+  ) => Promise<gmail_v1.Schema$VacationSettings>;
+  /** Get the current auto-forwarding configuration. */
+  getAutoForwarding: () => Promise<gmail_v1.Schema$AutoForwarding>;
+  /** Get the current IMAP access settings. */
+  getImap: () => Promise<gmail_v1.Schema$ImapSettings>;
+  /** Get the current POP access settings. */
+  getPop: () => Promise<gmail_v1.Schema$PopSettings>;
+  /** List all send-as aliases configured for the account. */
+  listSendAs: () => Promise<gmail_v1.Schema$SendAs[]>;
+  /** List all delegates who have access to this account. */
+  listDelegates: () => Promise<gmail_v1.Schema$Delegate[]>;
+  /** List all forwarding addresses configured for the account. */
+  listForwardingAddresses: () => Promise<gmail_v1.Schema$ForwardingAddress[]>;
+}
+
 /** Client for Gmail settings and profile API endpoints with rate limiting. */
-export class SettingsClient extends GmailClientBase {
+export class SettingsClient extends GmailClientBase implements ISettingsClient {
   /**
    * Get the authenticated user's Gmail profile (email, messages total, etc.).
    * @returns The user's Gmail profile data

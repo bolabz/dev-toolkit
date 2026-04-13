@@ -5,10 +5,7 @@
  */
 
 import type { gmail_v1 } from 'googleapis';
-import { GmailClientBase } from './base.js';
-
-/** Format options for retrieving Gmail messages. */
-export type MessageFormat = 'minimal' | 'metadata' | 'full' | 'raw';
+import { GmailClientBase, type MessageFormat } from './base.js';
 
 /** Query options for listing Gmail messages. */
 export interface ListMessagesOptions {
@@ -19,8 +16,62 @@ export interface ListMessagesOptions {
   includeSpamTrash?: boolean;
 }
 
+/** Options for auto-paginated message listing (pageToken handled internally). */
+export interface ListAllMessagesOptions {
+  query?: string;
+  maxResults?: number;
+  labelIds?: string[];
+  includeSpamTrash?: boolean;
+  maxPages?: number;
+}
+
+/** Public contract for Gmail message operations. */
+export interface IMessagesClient {
+  /** List message IDs matching a query with pagination. */
+  list: (options?: ListMessagesOptions) => Promise<{
+    messages: { id: string; threadId: string }[];
+    nextPageToken: string | null;
+    resultSizeEstimate: number;
+  }>;
+  /** List all message IDs matching a query, auto-paginating through all pages. */
+  listAll: (options?: ListAllMessagesOptions) => Promise<{ id: string; threadId: string }[]>;
+  /** Get a single message by ID. */
+  get: (
+    id: string,
+    format?: MessageFormat,
+    metadataHeaders?: string[],
+  ) => Promise<gmail_v1.Schema$Message>;
+  /** Get multiple messages by ID concurrently through the rate limiter. */
+  batchGet: (
+    ids: string[],
+    format?: MessageFormat,
+    metadataHeaders?: string[],
+  ) => Promise<gmail_v1.Schema$Message[]>;
+  /** Modify labels on a single message. */
+  modify: (
+    id: string,
+    addLabelIds?: string[],
+    removeLabelIds?: string[],
+  ) => Promise<gmail_v1.Schema$Message>;
+  /** Modify labels on up to 1000 messages in a single call. */
+  batchModify: (ids: string[], addLabelIds?: string[], removeLabelIds?: string[]) => Promise<void>;
+  /** Send a base64url-encoded RFC 2822 message. */
+  send: (raw: string, threadId?: string) => Promise<gmail_v1.Schema$Message>;
+  /** Move a message to Trash (recoverable for 30 days). */
+  trash: (id: string) => Promise<gmail_v1.Schema$Message>;
+  /** Recover a message from Trash. */
+  untrash: (id: string) => Promise<gmail_v1.Schema$Message>;
+  /** Permanently delete a message (cannot be undone). */
+  delete: (id: string) => Promise<void>;
+  /** Get attachment data for a message by message and attachment ID. */
+  getAttachment: (
+    messageId: string,
+    attachmentId: string,
+  ) => Promise<{ data: string; size: number }>;
+}
+
 /** Client for Gmail messages.* API endpoints with rate limiting. */
-export class MessagesClient extends GmailClientBase {
+export class MessagesClient extends GmailClientBase implements IMessagesClient {
   /**
    * List message IDs matching a query.
    * Returns IDs only — use get() or batchGet() for full data.
@@ -53,6 +104,32 @@ export class MessagesClient extends GmailClientBase {
       nextPageToken: response.data.nextPageToken ?? null,
       resultSizeEstimate: response.data.resultSizeEstimate ?? 0,
     };
+  }
+
+  /**
+   * List all message IDs matching a query, auto-paginating through all pages.
+   * @param options - Query, filter, and pagination options
+   * @returns All matching message ID/threadId pairs
+   */
+  async listAll(options: ListAllMessagesOptions = {}): Promise<{ id: string; threadId: string }[]> {
+    return this.paginate(
+      (pageToken) =>
+        this.gmail.users.messages.list({
+          userId: this.userId,
+          q: options.query,
+          maxResults: options.maxResults ?? 500,
+          pageToken,
+          labelIds: options.labelIds,
+          includeSpamTrash: options.includeSpamTrash ?? false,
+        }),
+      (response) =>
+        response.data.messages?.map((m) => ({
+          id: m.id ?? '',
+          threadId: m.threadId ?? '',
+        })),
+      options.maxPages ?? 50,
+      'messages.listAll',
+    );
   }
 
   /**

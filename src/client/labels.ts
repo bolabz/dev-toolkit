@@ -14,8 +14,32 @@ export interface CreateLabelOptions {
   color?: { textColor: string; backgroundColor: string };
 }
 
+/** Public contract for Gmail label operations. */
+export interface ILabelsClient {
+  /** List all labels in the account (system and user-created). */
+  list: () => Promise<gmail_v1.Schema$Label[]>;
+  /** Get a single label with accurate message/thread counts. */
+  get: (id: string) => Promise<gmail_v1.Schema$Label>;
+  /** Get multiple labels by ID concurrently through the rate limiter. */
+  batchGet: (ids: string[]) => Promise<gmail_v1.Schema$Label[]>;
+  /** Create a new user label with optional visibility and color settings. */
+  create: (name: string, options?: CreateLabelOptions) => Promise<gmail_v1.Schema$Label>;
+  /** Update an existing label's properties (name, visibility, color). */
+  update: (
+    id: string,
+    updates: Partial<{
+      name: string;
+      messageListVisibility: string;
+      labelListVisibility: string;
+      color: { textColor: string; backgroundColor: string };
+    }>,
+  ) => Promise<gmail_v1.Schema$Label>;
+  /** Permanently delete a label (messages are unlabeled, not deleted). */
+  delete: (id: string) => Promise<void>;
+}
+
 /** Client for Gmail labels.* API endpoints with rate limiting. */
-export class LabelsClient extends GmailClientBase {
+export class LabelsClient extends GmailClientBase implements ILabelsClient {
   /**
    * List all labels in the account (system and user-created).
    * @returns All Gmail labels without detailed counts

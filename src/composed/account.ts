@@ -1,87 +1,50 @@
 /**
- * Gmail Toolkit — Account Overview Composed Operation
+ * Gmail Toolkit — Account Context Composed Operation
  *
- * Fires all 8 settings endpoints in parallel (~200ms, ~1KB total, 8 quota units).
+ * One-call orientation: profile + labels + filters + settings.
+ * Profile (volatile: counts + history_id) is always fetched fresh.
+ * Settings (static: vacation, forwarding, IMAP, etc.) are cached.
+ * Labels and filters are fetched from their respective caches.
  */
 
-import type { GmailClient } from '../client/index.js';
-import type { AccountOverview } from '../types.js';
-import { logger } from '../logger.js';
-import { convert as htmlToText } from 'html-to-text';
-
-const log = logger.child('composed:account');
-
-const msToIso = (ms: string | null | undefined): string | null =>
-  ms != null ? new Date(Number(ms)).toISOString() : null;
+import type { GmailContext, AccountOverview, AccountContext } from './base.js';
+import { getLabels } from './labels.js';
+import { getFilters } from './filters.js';
 
 /**
  * Get account information including profile, vacation, and forwarding settings.
- * @param client - The authenticated Gmail API client
- * @returns A comprehensive overview of the authenticated Gmail account
+ * @param ctx - The authenticated Gmail context
+ * @returns Profile overview (volatile counts + cached settings)
  */
-export async function getAccount(client: GmailClient): Promise<AccountOverview> {
-  // All 8 calls in parallel — tiny responses, minimal quota
-  const [profile, vacation, forwarding, sendAs, delegates, forwardingAddresses, imap, pop] =
-    await Promise.all([
-      client.settings.getProfile(),
-      client.settings.getVacation(),
-      client.settings.getAutoForwarding(),
-      client.settings.listSendAs(),
-      client.settings.listDelegates().catch((err: unknown) => {
-        log.debug('listDelegates failed (likely missing delegate OAuth scope)', err);
-        return [];
-      }), // May fail without delegate scope
-      client.settings.listForwardingAddresses(),
-      client.settings.getImap(),
-      client.settings.getPop(),
-    ]);
+export async function getAccount(ctx: GmailContext): Promise<AccountOverview> {
+  const [profile, settings] = await Promise.all([
+    ctx.client.settings.getProfile(),
+    ctx.settingsCache.get(),
+  ]);
 
   return {
     email: profile.emailAddress ?? '',
     messages_total: profile.messagesTotal ?? 0,
     threads_total: profile.threadsTotal ?? 0,
     history_id: profile.historyId ?? '',
-    vacation: {
-      enabled: vacation.enableAutoReply ?? false,
-      subject: vacation.responseSubject ?? null,
-      start: msToIso(vacation.startTime),
-      end: msToIso(vacation.endTime),
-      restrict_to_contacts: vacation.restrictToContacts ?? false,
-    },
-    forwarding: {
-      enabled: forwarding.enabled ?? false,
-      email: forwarding.emailAddress ?? null,
-      disposition: forwarding.disposition ?? null,
-    },
-    forwarding_addresses: forwardingAddresses.map((fa) => ({
-      email: fa.forwardingEmail ?? '',
-      verified: fa.verificationStatus === 'accepted',
-    })),
-    send_as_aliases: sendAs.map((sa) => {
-      const sigHtml = sa.signature != null && sa.signature !== '' ? sa.signature : null;
-      return {
-        email: sa.sendAsEmail ?? '',
-        display_name: sa.displayName ?? '',
-        is_default: sa.isDefault ?? false,
-        is_primary: sa.isPrimary ?? false,
-        reply_to: sa.replyToAddress != null && sa.replyToAddress !== '' ? sa.replyToAddress : null,
-        signature_html: sigHtml,
-        signature_text: sigHtml != null ? htmlToText(sigHtml, { wordwrap: false }) : null,
-      };
-    }),
-    delegates: delegates.map((d) => ({
-      email: d.delegateEmail ?? '',
-      status: d.verificationStatus ?? 'unknown',
-    })),
-    imap: {
-      enabled: imap.enabled ?? false,
-      auto_expunge: imap.autoExpunge ?? true,
-      expunge_behavior: imap.expungeBehavior ?? '',
-    },
-    pop: {
-      enabled: pop.accessWindow !== 'disabled',
-      access_window: pop.accessWindow ?? 'disabled',
-      disposition: pop.disposition ?? '',
-    },
+    ...settings,
   };
+}
+
+/**
+ * Get full account context: profile + labels + filters + settings.
+ *
+ * Fetches profile, labels, and filters in parallel. Used by the unified
+ * `gmail_account` MCP tool for one-call account orientation.
+ * @param ctx - The authenticated Gmail context
+ * @returns Complete account context with all labels and filters
+ */
+export async function getAccountContext(ctx: GmailContext): Promise<AccountContext> {
+  const [account, labels, filters] = await Promise.all([
+    getAccount(ctx),
+    getLabels(ctx),
+    getFilters(ctx),
+  ]);
+
+  return { ...account, labels, filters };
 }

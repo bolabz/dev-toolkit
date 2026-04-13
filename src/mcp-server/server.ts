@@ -14,25 +14,31 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { logger } from './logger.js';
-import { createGmailContext, type GmailContext } from './composed/index.js';
-import { resolveToolRegistry, type ToolName, type ToolConfig } from './mcp-server/tool-registry.js';
-import { beginAuthFlow, MissingCredentialsError, AuthenticationRequiredError } from './auth.js';
+import {
+  logger,
+  createGmailContext,
+  ComposedClient,
+  type GmailContext,
+  resolveToolRegistry,
+  type ToolName,
+  type ToolConfig,
+  beginAuthFlow,
+  MissingCredentialsError,
+  AuthenticationRequiredError,
+} from './base.js';
 
-import { registerMessageTools } from './mcp-server/tools-messages.js';
-import { registerThreadTools } from './mcp-server/tools-threads.js';
-import { registerLabelTools } from './mcp-server/tools-labels.js';
-import { registerDraftTools } from './mcp-server/tools-drafts.js';
-import { registerFilterTools } from './mcp-server/tools-filters.js';
-import { registerAccountTools } from './mcp-server/tools-account.js';
-import { registerResources } from './mcp-server/resources.js';
-import { registerPrompts } from './mcp-server/prompts.js';
+import { registerReadTools } from './tools-read.js';
+import { registerCreateTools } from './tools-create.js';
+import { registerUpdateTools } from './tools-update.js';
+import { registerDeleteTools } from './tools-delete.js';
+import { registerResources } from './resources.js';
+import { registerPrompts } from './prompts.js';
 
 /** Signature shared by all domain-level tool registration functions. */
 type ToolRegistrar = (
   server: McpServer,
   registry: Record<ToolName, ToolConfig>,
-  context: GmailContext,
+  composed: ComposedClient,
 ) => void;
 
 const log = logger.child('mcp');
@@ -45,12 +51,10 @@ const mcpServer = new McpServer({
 const toolRegistry = resolveToolRegistry();
 
 const toolRegistrars: ToolRegistrar[] = [
-  registerMessageTools,
-  registerThreadTools,
-  registerLabelTools,
-  registerDraftTools,
-  registerFilterTools,
-  registerAccountTools,
+  registerReadTools,
+  registerCreateTools,
+  registerUpdateTools,
+  registerDeleteTools,
 ];
 
 // ---------------------------------------------------------------------------
@@ -122,10 +126,11 @@ async function startServer() {
  * @param context - The authenticated Gmail context
  */
 function registerAllTools(context: GmailContext): void {
+  const composed = new ComposedClient(context);
   for (const register of toolRegistrars) {
-    register(mcpServer, toolRegistry, context);
+    register(mcpServer, toolRegistry, composed);
   }
-  registerResources(mcpServer, context);
+  registerResources(mcpServer, composed);
 }
 
 /**

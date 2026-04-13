@@ -31,6 +31,19 @@ export const AttachmentInfoSchema = z.object({
 /** Metadata for a single email attachment (does not include the binary payload). */
 export type AttachmentInfo = z.infer<typeof AttachmentInfoSchema>;
 
+/**
+ * Compact date range for a thread or conversation.
+ * `last` is omitted when the thread contains a single message (first === last),
+ * saving ~24 bytes per thread in large result sets.
+ */
+export const DateRangeSchema = z.object({
+  first: z.string(),
+  /** Absent when the thread has only one message (first === last). */
+  last: z.string().optional(),
+});
+/** Thread date range: first-message date, and last-message date when the thread has multiple messages. */
+export type DateRange = z.infer<typeof DateRangeSchema>;
+
 // ---------------------------------------------------------------------------
 // Search / List Results
 // ---------------------------------------------------------------------------
@@ -41,7 +54,8 @@ export const MessageSummarySchema = z.object({
   thread_id: z.string(),
   from: ContactSchema,
   to: z.array(ContactSchema),
-  cc: z.array(ContactSchema),
+  /** Absent (not serialized) when the message has no CC recipients. */
+  cc: z.array(ContactSchema).optional(),
   subject: z.string(),
   date: z.string(), // ISO 8601 — derived from internalDate (Gmail receipt time, not sender Date header)
   snippet: z.string(),
@@ -50,17 +64,36 @@ export const MessageSummarySchema = z.object({
   is_starred: z.boolean(),
   is_mailing_list: z.boolean(),
   has_attachments: z.boolean(),
-  reply_to: ContactSchema.nullable(),
+  /** Absent (not serialized) when the message has no Reply-To header. */
+  reply_to: ContactSchema.optional(),
   size_bytes: z.number(),
-  history_id: z.string(),
-  web_url: z.string(),
-  body_text: z.string().nullable().optional(),
+  /** Absent (not serialized) when body was not requested (includeBody=false). */
+  body_text: z.string().optional(),
+  // Note: history_id and web_url are intentionally omitted from list results.
+  // web_url is derivable: `https://mail.google.com/mail/u/0/#all/${id}`
+  // history_id is a sync primitive — available on FullMessage for incremental sync use cases.
 });
 /**
  * Lightweight message representation included in search results.
  * Contains headers, labels, and optional processed body text but omits raw MIME parts.
+ * Sparse optional fields (cc, reply_to, body_text) are absent rather than null when empty.
  */
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
+
+/**
+ * Zod schema for a message nested inside a ThreadMatch result.
+ * Omits `subject` and `thread_id` — both are already present on the parent thread,
+ * so repeating them on every matched message is pure redundancy.
+ */
+export const MatchedMessageSummarySchema = MessageSummarySchema.omit({
+  subject: true,
+  thread_id: true,
+});
+/**
+ * Slim message representation used inside {@link ThreadMatch}.
+ * Omits `subject` and `thread_id` — both are available on the parent thread object.
+ */
+export type MatchedMessageSummary = z.infer<typeof MatchedMessageSummarySchema>;
 
 /** Zod schema for aggregate analytics derived from a search result set. */
 export const SearchSummarySchema = z.object({
@@ -140,10 +173,7 @@ export const FullThreadSchema = z.object({
   labels: z.array(z.string()),
   label_context: z.array(LabelContextSchema).optional(),
   has_unread: z.boolean(),
-  date_range: z.object({
-    first: z.string(),
-    last: z.string(),
-  }),
+  date_range: DateRangeSchema,
 });
 /**
  * Full email thread with all messages in chronological order, resolved label names,
@@ -214,12 +244,12 @@ export const DraftDetailSchema = z.object({
 /** Metadata for a single draft message including headers, snippet, and optional processed body. */
 export type DraftDetail = z.infer<typeof DraftDetailSchema>;
 
-/** Zod schema for a paginated draft listing with total count. */
+/** Zod schema for a complete draft listing with total count. */
 export const DraftSummarySchema = z.object({
   total: z.number(),
   drafts: z.array(DraftDetailSchema),
 });
-/** Paginated collection of drafts with total count and per-draft metadata. */
+/** Collection of all drafts with total count and per-draft metadata. */
 export type DraftSummary = z.infer<typeof DraftSummarySchema>;
 
 // ---------------------------------------------------------------------------
@@ -257,6 +287,21 @@ export const FilterCriteriaInputSchema = z.object({
 });
 /** Input criteria for searching, filtering, or modifying messages by structured fields. */
 export type FilterCriteriaInput = z.infer<typeof FilterCriteriaInputSchema>;
+
+/**
+ * Zod schema for search criteria — extends filter criteria with search-only fields
+ * (dates, label, status, filter_id) that are not valid for Gmail filter creation.
+ */
+export const SearchCriteriaInputSchema = FilterCriteriaInputSchema.extend({
+  after: z.string().optional(),
+  before: z.string().optional(),
+  label: z.string().optional(),
+  exclude_label: z.string().optional(),
+  is: z.enum(['unread', 'read', 'starred', 'important', 'snoozed']).optional(),
+  filter_id: z.string().optional(),
+});
+/** Search criteria extending filter criteria with date ranges, label filters, and status. */
+export type SearchCriteriaInput = z.infer<typeof SearchCriteriaInputSchema>;
 
 /** Zod schema for the actions applied when a Gmail filter matches a message. */
 export const FilterActionsSchema = z.object({
@@ -351,6 +396,17 @@ export const AccountOverviewSchema = z.object({
  */
 export type AccountOverview = z.infer<typeof AccountOverviewSchema>;
 
+/** Zod schema for the full account context combining profile, labels, and filters. */
+export const AccountContextSchema = AccountOverviewSchema.extend({
+  labels: LabelOverviewSchema,
+  filters: FilterOverviewSchema,
+});
+/**
+ * Full account context: profile + settings + all labels + all filters.
+ * Returned by the unified `gmail_account` MCP tool for one-call orientation.
+ */
+export type AccountContext = z.infer<typeof AccountContextSchema>;
+
 // ---------------------------------------------------------------------------
 // Write Operation Results
 // ---------------------------------------------------------------------------
@@ -413,6 +469,69 @@ export const SendResultSchema = z.object({
 export type SendResult = z.infer<typeof SendResultSchema>;
 
 // ---------------------------------------------------------------------------
+// Compose Mode (discriminated union for unified compose operations)
+// ---------------------------------------------------------------------------
+
+/** Zod schema for creating a new draft. */
+const ComposeDraftSchema = z.object({
+  mode: z.literal('draft'),
+  body: z.string(),
+  to: z.string().optional(),
+  subject: z.string().optional(),
+  cc: z.string().optional(),
+  bcc: z.string().optional(),
+  content_type: z.enum(['text/plain', 'text/html']).optional(),
+  thread_id: z.string().optional(),
+});
+
+/** Zod schema for updating an existing draft. */
+const ComposeUpdateDraftSchema = z.object({
+  mode: z.literal('update_draft'),
+  draft_id: z.string(),
+  body: z.string(),
+  to: z.string().optional(),
+  subject: z.string().optional(),
+  cc: z.string().optional(),
+  bcc: z.string().optional(),
+  content_type: z.enum(['text/plain', 'text/html']).optional(),
+  thread_id: z.string().optional(),
+});
+
+/** Zod schema for sending a new message directly. */
+const ComposeSendSchema = z.object({
+  mode: z.literal('send'),
+  to: z.string(),
+  subject: z.string(),
+  body: z.string(),
+  cc: z.string().optional(),
+  bcc: z.string().optional(),
+  content_type: z.enum(['text/plain', 'text/html']).optional(),
+  thread_id: z.string().optional(),
+});
+
+/** Zod schema for sending an existing draft. */
+const ComposeSendDraftSchema = z.object({
+  mode: z.literal('send_draft'),
+  draft_id: z.string(),
+});
+
+/**
+ * Discriminated union for all compose operations.
+ * - `draft`: Create a new draft
+ * - `update_draft`: Update an existing draft
+ * - `send`: Compose and send a new message directly
+ * - `send_draft`: Send an existing draft
+ */
+export const ComposeModeSchema = z.discriminatedUnion('mode', [
+  ComposeDraftSchema,
+  ComposeUpdateDraftSchema,
+  ComposeSendSchema,
+  ComposeSendDraftSchema,
+]);
+/** Discriminated union: draft | update_draft | send | send_draft. */
+export type ComposeMode = z.infer<typeof ComposeModeSchema>;
+
+// ---------------------------------------------------------------------------
 // Thread Search
 // ---------------------------------------------------------------------------
 
@@ -426,7 +545,7 @@ export const ThreadSummarySchema = z.object({
   subject: z.string().optional(),
   participants: z.array(ContactSchema).optional(),
   has_unread: z.boolean().optional(),
-  date_range: z.object({ first: z.string(), last: z.string() }).optional(),
+  date_range: DateRangeSchema.optional(),
 });
 /** Lightweight thread row from a search — use readThread() for full details. Enrichment fields present when enrich=true. */
 export type ThreadSummary = z.infer<typeof ThreadSummarySchema>;
@@ -458,11 +577,63 @@ export type HistoryEvent = z.infer<typeof HistoryEventSchema>;
 /** Zod schema for the result of polling mailbox history since a given history ID. */
 export const HistoryResultSchema = z.object({
   current_history_id: z.string(),
-  next_page_token: z.string().nullable(),
   events: z.array(HistoryEventSchema),
 });
-/** Incremental sync result: change events since the requested history ID and the new watermark. */
+/** Incremental sync result: all change events since the requested history ID and the new watermark. */
 export type HistoryResult = z.infer<typeof HistoryResultSchema>;
+
+// ---------------------------------------------------------------------------
+// Aggregated Search
+// ---------------------------------------------------------------------------
+
+/** Zod schema for a thread containing matched messages from an aggregated search. */
+export const ThreadMatchSchema = z.object({
+  id: z.string(),
+  subject: z.string(),
+  message_count: z.number(),
+  matched_count: z.number(),
+  participants: z.array(ContactSchema),
+  has_unread: z.boolean(),
+  date_range: DateRangeSchema,
+  matched_messages: z.array(MatchedMessageSummarySchema),
+});
+/** A thread with its matched messages from an aggregated search. */
+export type ThreadMatch = z.infer<typeof ThreadMatchSchema>;
+
+/** Zod schema for the complete result of an aggregated (all-pages) search. */
+export const SearchAllResultSchema = z.object({
+  total_messages: z.number(),
+  total_threads: z.number(),
+  threads: z.array(ThreadMatchSchema),
+  summary: SearchSummarySchema,
+});
+/** Complete aggregated search result: messages grouped by thread with analytics. */
+export type SearchAllResult = z.infer<typeof SearchAllResultSchema>;
+
+// ---------------------------------------------------------------------------
+// Message with Context
+// ---------------------------------------------------------------------------
+
+/** Zod schema for thread context attached to a retrieved message. */
+export const ThreadContextSchema = z.object({
+  id: z.string(),
+  subject: z.string(),
+  message_count: z.number(),
+  participants: z.array(ContactSchema),
+  has_unread: z.boolean(),
+  date_range: DateRangeSchema,
+  position: z.number(),
+});
+/** Thread context for a message: structure, participants, and chronological position. */
+export type ThreadContext = z.infer<typeof ThreadContextSchema>;
+
+/** Zod schema for a full message with its thread context. */
+export const MessageWithContextSchema = z.object({
+  message: FullMessageSchema,
+  thread: ThreadContextSchema,
+});
+/** A full message paired with its thread context (position, participants, date range). */
+export type MessageWithContext = z.infer<typeof MessageWithContextSchema>;
 
 // ---------------------------------------------------------------------------
 // Error (MCP response DTO)

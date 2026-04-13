@@ -37,18 +37,6 @@ npm run docs          # Generate API documentation (TypeDoc)
 - `@docs/architecture.mermaid` — Visual architecture diagram (Mermaid source)
 - `@docs/gmail-toolkit.api.md` — Generated API report (public types and functions) from API Extractor
 
-## Dev Tooling
-
-- **Prettier** (`@.prettierrc`): Code formatting — single quotes, trailing commas, 100 char width
-- **ESLint** (`@eslint.config.js`): Flat config — strict TypeScript, JSDoc enforcement, `no-console` (logger.ts exempt), `max-lines` (400 code-lines, skipBlankLines/skipComments)
-- **TypeDoc** (`@typedoc.json`): API documentation generation with strict validation
-- **dependency-cruiser** (`@.dependency-cruiser.cjs`): Layer boundary enforcement + architecture diagrams
-- **Lefthook** (`@lefthook.yml`): Git hooks — pre-commit (prettier + eslint), pre-push (full test suite), commit-msg (commitlint)
-- **Knip** (`@knip.json`): Dead code, unused exports, and unused dependency detection
-- **API Extractor** (`@api-extractor.json`): Public API surface diffing
-- **Commitlint** (`@commitlint.config.js`): Conventional commit message enforcement
-- **TypeScript**: Split config — `@tsconfig.json` (check, noEmit) + `@tsconfig.build.json` (emit, declarations)
-
 ## Testing
 
 45 test stubs (`it.todo()`) + 18 passing logger tests. Test infrastructure (vitest) is configured and working. Coverage via `npm run test:coverage` (v8 provider).

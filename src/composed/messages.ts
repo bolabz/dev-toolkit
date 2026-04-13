@@ -1,273 +1,369 @@
 /**
  * Gmail Toolkit — Message Composed Operations
  *
- * All message-level operations: search, read, modify, trash, send.
+ * Core message operations absorbing aggregated.ts:
+ *   search: auto-paginating thread-grouped search
+ *   read: batch-read messages with thread context
+ *   modify: unified label modification (IDs, thread IDs, or query)
+ *   trash: unified trash (message IDs or thread IDs)
  */
 
-import type { GmailClient } from '../client/index.js';
-import type { LabelCache } from './label-cache.js';
 import {
+  transformMessage,
+  logger,
+  normalizeMessageFields,
+  cleanSnippet,
+  hasAttachments,
+  deduplicateContacts,
   parseContact,
   parseContactList,
-  gmailWebUrl,
   headerMap,
-  parseDate,
-  hasAttachments,
   formatLabelChanges,
-  buildRfc2822Message,
-  transformMessage,
-  cleanSnippet,
-} from './helpers.js';
-import { processMessagePayload } from './body-processing.js';
-import type {
-  SearchResult,
-  MessageSummary,
-  FullMessage,
-  ModifyResult,
-  SendResult,
-} from '../types.js';
-import { logger } from '../logger.js';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const FREEMAIL_DOMAINS = new Set([
-  'gmail.com',
-  'yahoo.com',
-  'hotmail.com',
-  'outlook.com',
-  'aol.com',
-]);
-
-const SYSTEM_LABELS = new Set([
-  'INBOX',
-  'SENT',
-  'DRAFT',
-  'STARRED',
-  'UNREAD',
-  'SPAM',
-  'TRASH',
-  'IMPORTANT',
-  'CATEGORY_PERSONAL',
-  'CATEGORY_SOCIAL',
-  'CATEGORY_PROMOTIONS',
-  'CATEGORY_UPDATES',
-  'CATEGORY_FORUMS',
-]);
+  type GmailContext,
+  type SearchAllResult,
+  type ThreadMatch,
+  type MatchedMessageSummary,
+  type MessageWithContext,
+  type ThreadContext,
+  type FullMessage,
+  type Contact,
+  type ModifyResult,
+} from './base.js';
 
 const log = logger.child('composed:messages');
 
 const METADATA_HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date', 'Reply-To', 'List-Unsubscribe'];
 
 // ---------------------------------------------------------------------------
-// Search
+// search
 // ---------------------------------------------------------------------------
 
 /**
- * Search Gmail messages matching a query with analytics.
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
- * @param query - Gmail search query string (e.g. 'is:unread from:boss')
- * @param maxResults - Maximum number of results to return
- * @param pageToken - Pagination token from a previous search
- * @param includeBody - Whether to fetch and include message body text
- * @returns Search results with message summaries, sender counts, and label analytics
+ * Search Gmail and collect ALL matching messages across all pages, grouped by thread.
+ *
+ * Uses auto-paginated listAll() to collect message IDs, then fetches thread
+ * metadata to build thread-grouped results with analytics.
+ * @param ctx - The authenticated Gmail context
+ * @param query - Gmail search query string
+ * @param options - Optional configuration for filtering search results
+ * @param options.labelIds - Label IDs for efficient API-level filtering
+ * @returns All matching messages grouped by thread with aggregated analytics
  */
 export async function search(
-  client: GmailClient,
-  labelCache: LabelCache,
+  ctx: GmailContext,
   query: string,
-  maxResults = 20,
-  pageToken?: string,
-  includeBody = false,
-): Promise<SearchResult> {
-  // 1. List message IDs
-  const listResult = await client.messages.list({
+  options?: { labelIds?: string[] },
+): Promise<SearchAllResult> {
+  const { client, labelCache } = ctx;
+
+  // 1. Collect all matching message IDs + threadIds
+  const allMessages = await client.messages.listAll({
     query,
-    maxResults,
-    pageToken,
+    labelIds: options?.labelIds,
   });
 
-  if (listResult.messages.length === 0) {
+  if (allMessages.length === 0) {
     return {
-      total_estimate: listResult.resultSizeEstimate,
-      returned: 0,
-      next_page_token: listResult.nextPageToken,
-      messages: [],
+      total_messages: 0,
+      total_threads: 0,
+      threads: [],
       summary: { unread_count: 0, senders: {}, labels: {}, thread_message_counts: {} },
-      related_queries: [],
     };
   }
 
-  // 2. Batch get metadata (or full format if including body) for all messages
-  const ids = listResult.messages.map((m) => m.id);
-  const format = includeBody ? 'full' : 'metadata';
-  const headers = includeBody ? undefined : METADATA_HEADERS;
-  const rawMessages = await client.messages.batchGet(ids, format, headers);
+  // 2. Group matched message IDs by thread
+  const matchedByThread = new Map<string, Set<string>>();
+  for (const msg of allMessages) {
+    const set = matchedByThread.get(msg.threadId) ?? new Set<string>();
+    set.add(msg.id);
+    matchedByThread.set(msg.threadId, set);
+  }
 
-  // 3. Transform and resolve
-  const messages: MessageSummary[] = [];
+  // 3. Fetch thread metadata (includes all messages per thread)
+  const threadIds = [...matchedByThread.keys()];
+  const rawThreads = await client.threads.batchGet(threadIds, 'metadata', METADATA_HEADERS);
+
+  // 4. Build ThreadMatch for each thread
   const senderCounts: Record<string, number> = {};
   const labelCounts: Record<string, number> = {};
-  const senderDomains = new Set<string>();
+  const threadMessageCounts: Record<string, number> = {};
   let unreadCount = 0;
 
-  for (const raw of rawMessages) {
-    const msgHeaders = headerMap(raw.payload?.headers ?? []);
-    const from = parseContact(msgHeaders.get('From') ?? '');
-    const labelIds = raw.labelIds ?? [];
-    const resolvedLabels = await labelCache.resolve(labelIds);
-    const isUnread = labelIds.includes('UNREAD');
-    const isStarred = labelIds.includes('STARRED');
-    const isMailingList = msgHeaders.has('List-Unsubscribe');
+  const threads: ThreadMatch[] = [];
+  for (const rawThread of rawThreads) {
+    const threadId = rawThread.id ?? '';
+    const matchedIds = matchedByThread.get(threadId);
+    if (matchedIds == null) continue;
 
-    if (isUnread) unreadCount++;
+    const allMsgs = rawThread.messages ?? [];
+    threadMessageCounts[threadId] = allMsgs.length;
 
-    // Track sender counts and domains
-    const senderKey = from.name ?? from.email;
-    senderCounts[senderKey] = (senderCounts[senderKey] ?? 0) + 1;
-    const emailDomain = from.email.split('@')[1];
-    if (emailDomain) senderDomains.add(emailDomain.toLowerCase());
+    // Build MessageSummary for matched messages only
+    const matchedMessages: MatchedMessageSummary[] = [];
+    const allParticipants: Contact[] = [];
+    let threadHasUnread = false;
 
-    // Track label counts
-    for (const label of resolvedLabels) {
-      labelCounts[label] = (labelCounts[label] ?? 0) + 1;
-    }
+    for (const raw of allMsgs) {
+      const msgId = raw.id ?? '';
+      const labelIds = raw.labelIds ?? [];
+      const isUnread = labelIds.includes('UNREAD');
+      if (isUnread) threadHasUnread = true;
 
-    let bodyText: string | null = null;
-    if (includeBody) {
-      const { text } = await processMessagePayload(
-        raw.payload ?? {},
-        raw.payload?.mimeType ?? undefined,
-        { stripReplies: true, includeHtml: false },
+      // Build participant list from all messages (not just matched)
+      const h = headerMap(raw.payload?.headers ?? []);
+      allParticipants.push(
+        parseContact(h.get('From') ?? ''),
+        ...parseContactList(h.get('To') ?? ''),
+        ...parseContactList(h.get('Cc') ?? ''),
       );
-      bodyText = text;
+
+      if (!matchedIds.has(msgId)) continue;
+
+      // Matched message — build MatchedMessageSummary (omits subject + thread_id: on thread)
+      const resolvedLabels = await labelCache.resolve(labelIds);
+      const fields = normalizeMessageFields(raw, resolvedLabels);
+
+      if (fields.is_unread) unreadCount++;
+
+      const senderKey = fields.from.name ?? fields.from.email;
+      senderCounts[senderKey] = (senderCounts[senderKey] ?? 0) + 1;
+      for (const label of resolvedLabels) {
+        labelCounts[label] = (labelCounts[label] ?? 0) + 1;
+      }
+
+      matchedMessages.push({
+        id: fields.id,
+        from: fields.from,
+        to: fields.to,
+        ...(fields.cc != null ? { cc: fields.cc } : {}),
+        date: fields.date,
+        labels: fields.labels,
+        is_unread: fields.is_unread,
+        is_starred: fields.is_starred,
+        is_mailing_list: fields.is_mailing_list,
+        ...(fields.reply_to != null ? { reply_to: fields.reply_to } : {}),
+        size_bytes: fields.size_bytes,
+        snippet: cleanSnippet(raw.snippet ?? ''),
+        has_attachments: hasAttachments(raw.payload, raw.sizeEstimate),
+      });
     }
 
-    // Prefer Gmail's internalDate (receipt time) over the sender Date header
-    const date =
-      raw.internalDate != null
-        ? new Date(Number(raw.internalDate)).toISOString()
-        : parseDate(msgHeaders.get('Date') ?? '');
+    const firstInternalDate = allMsgs[0]?.internalDate ?? null;
+    const firstDate =
+      firstInternalDate != null ? new Date(Number(firstInternalDate)).toISOString() : '';
+    const lastInternalDate = allMsgs.at(-1)?.internalDate ?? null;
+    const lastDate =
+      lastInternalDate != null ? new Date(Number(lastInternalDate)).toISOString() : '';
+    const firstHeaders = headerMap(allMsgs[0]?.payload?.headers ?? []);
 
-    const replyToRaw = msgHeaders.get('Reply-To');
-    const replyTo = replyToRaw != null && replyToRaw !== '' ? parseContact(replyToRaw) : null;
-
-    messages.push({
-      id: raw.id ?? '',
-      thread_id: raw.threadId ?? '',
-      from,
-      to: parseContactList(msgHeaders.get('To') ?? ''),
-      cc: parseContactList(msgHeaders.get('Cc') ?? ''),
-      subject: msgHeaders.get('Subject') ?? '(no subject)',
-      date,
-      snippet: cleanSnippet(raw.snippet ?? ''),
-      labels: resolvedLabels,
-      is_unread: isUnread,
-      is_starred: isStarred,
-      is_mailing_list: isMailingList,
-      has_attachments: hasAttachments(raw.payload, raw.sizeEstimate),
-      reply_to: replyTo,
-      size_bytes: raw.sizeEstimate ?? 0,
-      history_id: raw.historyId ?? '',
-      web_url: gmailWebUrl(raw.id ?? ''),
-      body_text: bodyText,
+    threads.push({
+      id: threadId,
+      subject: firstHeaders.get('Subject') ?? '(no subject)',
+      message_count: allMsgs.length,
+      matched_count: matchedMessages.length,
+      participants: deduplicateContacts(allParticipants),
+      has_unread: threadHasUnread,
+      // Omit `last` when the thread has only one message (first === last)
+      date_range: { first: firstDate, ...(lastDate !== firstDate ? { last: lastDate } : {}) },
+      matched_messages: matchedMessages,
     });
   }
 
-  // Fetch total message count per thread (non-fatal on failure)
-  let threadMessageCounts: Record<string, number> = {};
-  const uniqueThreadIds = [...new Set(messages.map((m) => m.thread_id))];
-  if (uniqueThreadIds.length > 0) {
-    try {
-      const threads = await client.threads.batchGet(uniqueThreadIds, 'minimal');
-      for (const thread of threads) {
-        if (thread.id != null && thread.id !== '') {
-          threadMessageCounts[thread.id] = (thread.messages ?? []).length;
-        }
-      }
-    } catch (err) {
-      log.debug('Non-fatal: failed to fetch thread message counts, returning empty map', err);
-      threadMessageCounts = {};
-    }
-  }
-
   return {
-    total_estimate: listResult.resultSizeEstimate,
-    returned: messages.length,
-    next_page_token: listResult.nextPageToken,
-    messages,
+    total_messages: allMessages.length,
+    total_threads: threads.length,
+    threads,
     summary: {
       unread_count: unreadCount,
       senders: senderCounts,
       labels: labelCounts,
       thread_message_counts: threadMessageCounts,
     },
-    related_queries: generateRelatedQueries(senderDomains, labelCounts, query),
   };
 }
 
 // ---------------------------------------------------------------------------
-// Read
+// read
 // ---------------------------------------------------------------------------
 
 /**
- * Read a single message with full headers, body, and metadata.
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
- * @param messageId - The Gmail message ID to read
- * @param includeHtml - Whether to include raw HTML alongside plain text
- * @returns The fully resolved message with parsed contacts and labels
+ * Fetch full messages by ID with thread context (participants, position, date range).
+ *
+ * Batch-fetches messages and their threads concurrently, then merges
+ * each message with its thread's structural metadata.
+ * @param ctx - The authenticated Gmail context
+ * @param messageIds - The Gmail message IDs to retrieve
+ * @param options - Processing options
+ * @param options.includeHtml - Whether to include raw HTML body alongside plain text
+ * @returns Full messages paired with their thread context
  */
-export async function readMessage(
-  client: GmailClient,
-  labelCache: LabelCache,
-  messageId: string,
-  includeHtml = false,
-): Promise<FullMessage> {
-  const raw = await client.messages.get(messageId, 'full');
-  return transformMessage(raw, labelCache, { stripReplies: true, includeHtml });
+export async function read(
+  ctx: GmailContext,
+  messageIds: string[],
+  options?: { includeHtml?: boolean },
+): Promise<MessageWithContext[]> {
+  if (messageIds.length === 0) return [];
+
+  const { client, labelCache } = ctx;
+  const includeHtml = options?.includeHtml ?? false;
+
+  // 1. Batch-get full messages
+  const rawMessages = await client.messages.batchGet(messageIds, 'full');
+
+  // 2. Transform each into FullMessage
+  const messages: FullMessage[] = await Promise.all(
+    rawMessages.map((raw) =>
+      transformMessage(raw, labelCache, { stripReplies: true, includeHtml }),
+    ),
+  );
+
+  // 3. Group by thread_id to find unique threads
+  const threadIds = [...new Set(messages.map((m) => m.thread_id))];
+
+  // 4. Fetch thread metadata concurrently
+  const rawThreads = await client.threads.batchGet(threadIds, 'metadata', [
+    'From',
+    'To',
+    'Cc',
+    'Subject',
+  ]);
+
+  // 5. Build thread context lookup
+  const threadContextMap = new Map<
+    string,
+    { context: Omit<ThreadContext, 'position'>; messageOrder: string[] }
+  >();
+  for (const rawThread of rawThreads) {
+    const tid = rawThread.id ?? '';
+    const msgs = rawThread.messages ?? [];
+
+    const allParticipants: Contact[] = msgs.flatMap((m) => {
+      const h = headerMap(m.payload?.headers ?? []);
+      return [
+        parseContact(h.get('From') ?? ''),
+        ...parseContactList(h.get('To') ?? ''),
+        ...parseContactList(h.get('Cc') ?? ''),
+      ];
+    });
+
+    const firstHeaders = headerMap(msgs[0]?.payload?.headers ?? []);
+    const firstInternalDate = msgs[0]?.internalDate ?? null;
+    const firstDate =
+      firstInternalDate != null ? new Date(Number(firstInternalDate)).toISOString() : '';
+    const lastInternalDate = msgs.at(-1)?.internalDate ?? null;
+    const lastDate =
+      lastInternalDate != null ? new Date(Number(lastInternalDate)).toISOString() : '';
+
+    threadContextMap.set(tid, {
+      context: {
+        id: tid,
+        subject: firstHeaders.get('Subject') ?? '(no subject)',
+        message_count: msgs.length,
+        participants: deduplicateContacts(allParticipants),
+        has_unread: msgs.some((m) => (m.labelIds ?? []).includes('UNREAD')),
+        // Omit `last` when the thread has only one message (first === last)
+        date_range: { first: firstDate, ...(lastDate !== firstDate ? { last: lastDate } : {}) },
+      },
+      messageOrder: msgs.map((m) => m.id ?? ''),
+    });
+  }
+
+  // 6. Pair each message with its thread context
+  return messages.map((message) => {
+    const entry = threadContextMap.get(message.thread_id);
+    if (entry == null) {
+      // Fallback: thread fetch failed — derive minimal context from message itself
+      log.debug(`Thread context unavailable for ${message.thread_id}, using message-only fallback`);
+      return {
+        message,
+        thread: {
+          id: message.thread_id,
+          subject: message.subject,
+          message_count: 1,
+          participants: [message.from, ...message.to, ...message.cc],
+          has_unread: message.is_unread,
+          // Single-message thread: last === first, so omit last
+          date_range: { first: message.date },
+          position: 1,
+        },
+      };
+    }
+
+    const position = entry.messageOrder.indexOf(message.id) + 1;
+    return {
+      message,
+      thread: { ...entry.context, position: position > 0 ? position : 1 },
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Modify
+// modify
 // ---------------------------------------------------------------------------
 
 /**
- * Modify labels on one or more messages.
- * Accepts human-readable label names (resolves to IDs via cache).
- * Uses batchModify for efficiency (up to 1000 IDs per call).
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
- * @param messageIds - The message IDs to modify
- * @param addLabels - Label names to apply to the messages
- * @param removeLabels - Label names to remove from the messages
- * @returns A summary of modifications with any failed message IDs
+ * Unified label modification targeting messages by ID, thread ID, or search query.
+ *
+ * Resolves targets to message IDs, then applies label changes in chunks of 1000
+ * using batchModify with individual retry on chunk failure.
+ * @param ctx - The authenticated Gmail context
+ * @param targets - Message targeting: messageIds, threadIds, or a search query
+ * @param targets.messageIds - Array of message IDs
+ * @param targets.threadIds - Array of thread IDs
+ * @param targets.query - Gmail search query
+ * @param addLabels - Label names to apply (resolved to IDs via cache)
+ * @param removeLabels - Label names to remove (resolved to IDs via cache)
+ * @returns A summary of modifications with count and any failed IDs
  */
-export async function modifyMessages(
-  client: GmailClient,
-  labelCache: LabelCache,
-  messageIds: string[],
+export async function modify(
+  ctx: GmailContext,
+  targets: { messageIds?: string[]; threadIds?: string[]; query?: string },
   addLabels: string[] = [],
   removeLabels: string[] = [],
 ): Promise<ModifyResult> {
+  const { client, labelCache } = ctx;
+
+  // --- Resolve targets to message IDs ---
+  let messageIds: string[];
+
+  if (targets.query != null) {
+    // Query-based: auto-paginate to collect all matching message IDs
+    const allMessages = await client.messages.listAll({ query: targets.query });
+    messageIds = allMessages.map((m) => m.id);
+  } else if (targets.messageIds != null) {
+    // Direct message IDs
+    messageIds = targets.messageIds;
+  } else if (targets.threadIds != null) {
+    // Thread-based: fetch threads and extract all message IDs
+    const rawThreads = await client.threads.batchGet(targets.threadIds, 'minimal');
+    messageIds = rawThreads.flatMap((t) =>
+      (t.messages ?? []).map((m) => m.id).filter((id): id is string => id != null),
+    );
+  } else {
+    return { modified: 0, failed: [], message: 'No targets specified.' };
+  }
+
+  if (messageIds.length === 0) {
+    return { modified: 0, failed: [], message: 'No messages matched.' };
+  }
+
+  // --- Resolve label names to IDs ---
   const addLabelIds = addLabels.length > 0 ? await labelCache.lookupMany(addLabels) : [];
   const removeLabelIds = removeLabels.length > 0 ? await labelCache.lookupMany(removeLabels) : [];
 
+  // --- Process in chunks of 1000 (Gmail batchModify limit) ---
   const failed: string[] = [];
 
-  // Process in chunks of 1000 (Gmail batchModify limit)
   for (let i = 0; i < messageIds.length; i += 1000) {
     const chunk = messageIds.slice(i, i + 1000);
     try {
       await client.messages.batchModify(chunk, addLabelIds, removeLabelIds);
     } catch (err) {
-      log.debug(
-        `batchModify failed for chunk of ${chunk.length} messages, retrying individually`,
+      log.warn(
+        `batchModify failed for chunk of ${chunk.length} messages (partial application possible), retrying individually`,
         err,
       );
-      // If batch fails, try individually to identify which messages failed
+      // Batch may have partially applied — retry individually to confirm each.
       for (const id of chunk) {
         try {
           await client.messages.modify(id, addLabelIds, removeLabelIds);
@@ -290,154 +386,72 @@ export async function modifyMessages(
 }
 
 // ---------------------------------------------------------------------------
-// Trash
+// trash
 // ---------------------------------------------------------------------------
 
 /**
- * Move messages to the trash (recoverable for 30 days).
- * @param client - The authenticated Gmail API client
- * @param messageIds - The Gmail message IDs to trash
+ * Unified trash targeting messages by ID or thread ID.
+ *
+ * Trashes messages individually via messages.trash or threads.trash,
+ * combining results into a single ModifyResult.
+ * @param ctx - The authenticated Gmail context
+ * @param targets - Trash targeting: messageIds or threadIds (or both)
+ * @param targets.messageIds - Array of message IDs
+ * @param targets.threadIds - Array of thread IDs
  * @returns A summary of the operation with counts and any failed IDs
  */
-export async function trashMessages(
-  client: GmailClient,
-  messageIds: string[],
+export async function trash(
+  ctx: GmailContext,
+  targets: { messageIds?: string[]; threadIds?: string[] },
 ): Promise<ModifyResult> {
+  const { client } = ctx;
   const failed: string[] = [];
-  for (const id of messageIds) {
-    try {
-      await client.messages.trash(id);
-    } catch (err) {
-      log.debug(`Failed to trash message ${id}`, err);
-      failed.push(id);
+  let totalCount = 0;
+
+  // --- Trash individual messages ---
+  if (targets.messageIds != null && targets.messageIds.length > 0) {
+    const msgIds = targets.messageIds;
+    totalCount += msgIds.length;
+    const results = await Promise.allSettled(msgIds.map((id) => client.messages.trash(id)));
+
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'rejected') {
+        log.debug(
+          `Failed to trash message ${msgIds[i]}`,
+          (results[i] as PromiseRejectedResult).reason,
+        );
+        failed.push(msgIds[i]);
+      }
     }
   }
+
+  // --- Trash threads ---
+  if (targets.threadIds != null && targets.threadIds.length > 0) {
+    const threadIds = targets.threadIds;
+    totalCount += threadIds.length;
+    const results = await Promise.allSettled(threadIds.map((id) => client.threads.trash(id)));
+
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'rejected') {
+        log.debug(
+          `Failed to trash thread ${threadIds[i]}`,
+          (results[i] as PromiseRejectedResult).reason,
+        );
+        failed.push(threadIds[i]);
+      }
+    }
+  }
+
+  if (totalCount === 0) {
+    return { modified: 0, failed: [], message: 'No targets specified.' };
+  }
+
   return {
-    modified: messageIds.length - failed.length,
+    modified: totalCount - failed.length,
     failed,
     message:
       failed.length === 0
-        ? `Moved ${messageIds.length} message(s) to Trash. Recoverable for 30 days.`
-        : `Trashed ${messageIds.length - failed.length} of ${messageIds.length} messages. ${failed.length} failed.`,
+        ? `Moved ${totalCount} item(s) to Trash. Recoverable for 30 days.`
+        : `Trashed ${totalCount - failed.length} of ${totalCount} items. ${failed.length} failed.`,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Send
-// ---------------------------------------------------------------------------
-
-/**
- * Compose and send a new email message directly.
- * @param client - The authenticated Gmail API client
- * @param options - The message composition options
- * @param options.to - Recipient email address
- * @param options.subject - The email subject line
- * @param options.body - The email body content
- * @param options.cc - CC recipient email addresses
- * @param options.bcc - BCC recipient email addresses
- * @param options.contentType - MIME type for the body content
- * @param options.threadId - Thread ID to send as a reply in a conversation
- * @returns The send result with the new message and thread IDs
- */
-export async function sendMessage(
-  client: GmailClient,
-  options: {
-    to: string;
-    subject: string;
-    body: string;
-    cc?: string;
-    bcc?: string;
-    contentType?: string;
-    threadId?: string;
-  },
-): Promise<SendResult> {
-  const raw = Buffer.from(buildRfc2822Message(options)).toString('base64url');
-  const result = await client.messages.send(raw, options.threadId);
-  return {
-    message_id: result.id ?? '',
-    thread_id: result.threadId ?? null,
-    message: `Email sent to ${options.to}. Subject: "${options.subject}".`,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Search and Modify
-// ---------------------------------------------------------------------------
-
-/**
- * Search for messages matching a query and modify their labels in one operation.
- * Paginates through results up to maxMessages, then applies label changes.
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
- * @param query - Gmail search query string
- * @param addLabels - Label names to apply to matching messages
- * @param removeLabels - Label names to remove from matching messages
- * @param maxMessages - Safety cap on total messages to modify (default 500)
- * @returns A summary of modifications with any failed message IDs
- */
-export async function searchAndModify(
-  client: GmailClient,
-  labelCache: LabelCache,
-  query: string,
-  addLabels: string[] = [],
-  removeLabels: string[] = [],
-  maxMessages = 500,
-): Promise<ModifyResult> {
-  // Paginate through search results collecting message IDs
-  const allIds: string[] = [];
-  let pageToken: string | undefined;
-
-  while (allIds.length < maxMessages) {
-    const page = await client.messages.list({
-      query,
-      maxResults: Math.min(500, maxMessages - allIds.length),
-      pageToken,
-    });
-    for (const msg of page.messages) {
-      allIds.push(msg.id);
-      if (allIds.length >= maxMessages) break;
-    }
-    pageToken = page.nextPageToken ?? undefined;
-    if (pageToken === undefined) break;
-  }
-
-  if (allIds.length === 0) {
-    return { modified: 0, failed: [], message: 'No messages matched the query.' };
-  }
-
-  return modifyMessages(client, labelCache, allIds, addLabels, removeLabels);
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Generate broadening search query suggestions from search result data.
- * @param senderDomains - Unique email domains seen across matched senders
- * @param labelCounts - Label name to message count frequency map
- * @param originalQuery - The original search query string for deduplication
- * @returns Array of suggested Gmail search queries (max 5)
- */
-function generateRelatedQueries(
-  senderDomains: Set<string>,
-  labelCounts: Record<string, number>,
-  originalQuery: string,
-): string[] {
-  const queries: string[] = [];
-  const lowerQuery = originalQuery.toLowerCase();
-
-  for (const domain of senderDomains) {
-    if (!FREEMAIL_DOMAINS.has(domain) && !lowerQuery.includes(domain)) {
-      queries.push(`from:@${domain}`);
-    }
-  }
-
-  for (const label of Object.keys(labelCounts)) {
-    if (!SYSTEM_LABELS.has(label) && !lowerQuery.includes(`label:${label.toLowerCase()}`)) {
-      queries.push(`label:${label.toLowerCase().replace(/\s+/g, '-')}`);
-    }
-  }
-
-  return queries.slice(0, 5);
 }

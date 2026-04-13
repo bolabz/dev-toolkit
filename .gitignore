@@ -10,7 +10,7 @@ scripts/**/*.d.ts.map
 
 # Debug output
 scripts/debug-raw-output.json
-
+scripts/debug-layer2-output.json
 # Auth credentials (NEVER commit these)
 credentials.json
 token.json

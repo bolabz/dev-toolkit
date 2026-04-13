@@ -18,13 +18,13 @@
     "CHANGELOG.md"
   ],
   "bin": {
-    "gmail-toolkit": "dist/mcp-server.js"
+    "gmail-toolkit": "dist/mcp-server/server.js"
   },
   "scripts": {
     "prepare": "lefthook install",
     "setup-auth": "tsx scripts/setup-auth.ts",
-    "dev": "tsx src/mcp-server.ts",
-    "test:watch": "vitest",
+    "debug:raw": "tsx scripts/debug-raw-api.ts",
+    "debug:layer2": "tsx scripts/debug-layer2.ts",
     "knip:fix": "knip --fix",
     "lint:fix": "eslint --max-warnings 0 --fix src/ tests/",
     "prettier:fix": "prettier --write .",
@@ -45,11 +45,12 @@
     "deps:diagram:update": "npm run deps:diagram:mermaid && npm run deps:diagram:svg",
     "docs:update": "typedoc",
     "api:update": "api-extractor run --config api-extractor.json --local",
-    "docs": "npm run docs:update && npm run api:update && npm run deps:diagram:mermaid",
+    "docs": "npm run docs:update && npm run api:update && npm run deps:diagram:update",
     "clean": "rm -rf dist logs",
     "compile": "tsc -p tsconfig.build.json",
     "build": "npm run clean && npm run compile && npm run docs",
-    "start": "npm run build && node dist/mcp-server.js"
+    "start": "npm run build && node dist/mcp-server/server.js",
+    "ci": "npm run test && npm run build"
   },
   "keywords": [
     "gmail",
@@ -80,6 +81,7 @@
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^10.0.1",
+    "@mermaid-js/mermaid-cli": "^11.12.0",
     "@microsoft/api-extractor": "^7.58.2",
     "@types/he": "^1.2.3",
     "@types/html-to-text": "^9.0.4",
