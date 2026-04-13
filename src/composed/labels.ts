@@ -7,10 +7,13 @@
  */
 
 import type { gmail_v1 } from 'googleapis';
-import type { GmailClient } from '../client/index.js';
-import type { LabelCache } from './label-cache.js';
-import type { LabelDetail, LabelOverview, DeleteLabelResult } from '../types.js';
-import { logger } from '../logger.js';
+import {
+  logger,
+  type GmailContext,
+  type LabelDetail,
+  type LabelOverview,
+  type DeleteLabelResult,
+} from './base.js';
 
 const log = logger.child('composed:labels');
 
@@ -46,14 +49,11 @@ const SYSTEM_LABELS_WITH_COUNTS = new Set(['INBOX', 'SENT', 'TRASH', 'SPAM', 'DR
 /**
  * Get comprehensive label overview with counts.
  * Fetches individual counts for user labels and key system labels (INBOX, SENT, TRASH, SPAM, DRAFT).
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
+ * @param ctx - The authenticated Gmail context
  * @returns A comprehensive overview of all labels with counts and summaries
  */
-export async function getLabels(
-  client: GmailClient,
-  labelCache: LabelCache,
-): Promise<LabelOverview> {
+export async function getLabels(ctx: GmailContext): Promise<LabelOverview> {
+  const { client, labelCache } = ctx;
   const allLabels = await client.labels.list();
 
   // Classify labels
@@ -115,8 +115,7 @@ export async function getLabels(
 
 /**
  * Create a new label.
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
+ * @param ctx - The authenticated Gmail context
  * @param name - The display name for the new label
  * @param options - Optional settings including label color
  * @param options.color - The label color configuration
@@ -125,11 +124,11 @@ export async function getLabels(
  * @returns The created label with its details
  */
 export async function createLabel(
-  client: GmailClient,
-  labelCache: LabelCache,
+  ctx: GmailContext,
   name: string,
   options?: { color?: { text: string; background: string } },
 ): Promise<LabelDetail> {
+  const { client, labelCache } = ctx;
   const created = await client.labels.create(name, {
     color: options?.color
       ? { textColor: options.color.text, backgroundColor: options.color.background }
@@ -143,8 +142,7 @@ export async function createLabel(
 
 /**
  * Update an existing label (by name or ID).
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
+ * @param ctx - The authenticated Gmail context
  * @param nameOrId - The label name or ID to update
  * @param updates - The fields to change
  * @param updates.new_name - The new display name for the label
@@ -154,11 +152,12 @@ export async function createLabel(
  * @returns The updated label with its details
  */
 export async function updateLabel(
-  client: GmailClient,
-  labelCache: LabelCache,
+  ctx: GmailContext,
   nameOrId: string,
   updates: { new_name?: string; color?: { text: string; background: string } },
 ): Promise<LabelDetail> {
+  const { client, labelCache } = ctx;
+
   // Resolve name to ID if needed
   const id = (await labelCache.lookup(nameOrId)) ?? nameOrId;
 
@@ -180,16 +179,13 @@ export async function updateLabel(
 
 /**
  * Permanently delete a Gmail label. Messages are not deleted, only unlabeled.
- * @param client - The authenticated Gmail API client
- * @param labelCache - The label name-to-ID resolution cache
+ * @param ctx - The authenticated Gmail context
  * @param nameOrId - The label name or ID to delete
  * @returns The deletion result with affected message and thread counts
  */
-export async function deleteLabel(
-  client: GmailClient,
-  labelCache: LabelCache,
-  nameOrId: string,
-): Promise<DeleteLabelResult> {
+export async function deleteLabel(ctx: GmailContext, nameOrId: string): Promise<DeleteLabelResult> {
+  const { client, labelCache } = ctx;
+
   const id = (await labelCache.lookup(nameOrId)) ?? nameOrId;
 
   // Fetch label details BEFORE deleting so we can report what was affected

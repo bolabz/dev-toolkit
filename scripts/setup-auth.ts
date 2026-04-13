@@ -10,8 +10,8 @@
  * happens seamlessly on first use in any mode.
  */
 
-import { ensureAuthenticated } from '../src/auth.js';
-import { logger } from '../src/logger.js';
+import { ensureAuthenticated } from '../src/shared/auth.js';
+import { logger } from '../src/shared/logger.js';
 
 const log = logger.child('setup');
 

@@ -1,43 +1,50 @@
 /**
  * Gmail Toolkit — Draft Composed Operations
+ *
+ * getDrafts: auto-paginated listing of all drafts
+ * compose: unified draft/send (4 modes: draft, update_draft, send, send_draft)
  */
 
-import type { GmailClient } from '../client/index.js';
-import type { LabelCache } from './label-cache.js';
 import {
+  type GmailContext,
   parseContactList,
   parseDate,
   hasAttachments,
   headerMap,
   buildRfc2822Message,
-} from './helpers.js';
-import { processMessagePayload } from './body-processing.js';
-import type { DraftSummary, DraftDetail, DeleteResult, SendResult } from '../types.js';
+  processMessagePayload,
+  type DraftSummary,
+  type DraftDetail,
+  type DeleteResult,
+  type SendResult,
+  type ComposeMode,
+} from './base.js';
 import he from 'he';
 
+// ---------------------------------------------------------------------------
+// getDrafts — auto-paginated
+// ---------------------------------------------------------------------------
+
 /**
- * List draft messages with optional body content.
- * @param client - The authenticated Gmail API client
- * @param _labelCache - The label cache (unused but kept for API consistency)
- * @param maxResults - Maximum number of drafts to return
+ * List all drafts with optional body content (auto-paginated).
+ * @param ctx - The authenticated Gmail context
  * @param query - Optional Gmail search query to filter drafts
  * @param includeBody - Whether to include draft body text
- * @returns A summary of matching drafts with metadata
+ * @returns All matching drafts with metadata
  */
 export async function getDrafts(
-  client: GmailClient,
-  _labelCache: LabelCache,
-  maxResults = 10,
+  ctx: GmailContext,
   query?: string,
   includeBody = false,
 ): Promise<DraftSummary> {
-  const listResult = await client.drafts.list({ maxResults, query });
+  const { client } = ctx;
+  const allDraftIds = await client.drafts.listAll({ query });
 
-  if (listResult.drafts.length === 0) {
-    return { total: listResult.resultSizeEstimate, drafts: [] };
+  if (allDraftIds.length === 0) {
+    return { total: 0, drafts: [] };
   }
 
-  const ids = listResult.drafts.map((d) => d.id);
+  const ids = allDraftIds.map((d) => d.id);
   const format = includeBody ? 'full' : 'metadata';
   const rawDrafts = await client.drafts.batchGet(ids, format);
 
@@ -70,37 +77,53 @@ export async function getDrafts(
     });
   }
 
-  return { total: listResult.resultSizeEstimate, drafts };
+  return { total: drafts.length, drafts };
 }
 
+// ---------------------------------------------------------------------------
+// compose — unified draft/send (4 modes)
+// ---------------------------------------------------------------------------
+
 /**
- * Create a new draft from structured input.
- * @param client - The authenticated Gmail API client
- * @param options - The draft composition options
- * @param options.to - Recipient email address
- * @param options.cc - CC recipient email addresses
- * @param options.bcc - BCC recipient email addresses
- * @param options.subject - The email subject line
- * @param options.body - The email body content
- * @param options.contentType - MIME type: 'text/plain' or 'text/html'
- * @param options.threadId - Thread ID to associate the draft with a conversation
- * @returns The created draft with message details
+ * Unified compose operation: create draft, update draft, send message, or send draft.
+ * @param ctx - The authenticated Gmail context
+ * @param params - Discriminated union by `mode`
+ * @returns DraftDetail for draft/update_draft modes, SendResult for send/send_draft modes
  */
-export async function createDraft(
-  client: GmailClient,
-  options: {
-    to?: string;
-    cc?: string;
-    bcc?: string;
-    subject?: string;
-    body: string;
-    contentType?: 'text/plain' | 'text/html';
-    threadId?: string;
-  },
-): Promise<DraftDetail> {
-  const raw = buildRfc2822Message(options);
+export async function compose(
+  ctx: GmailContext,
+  params: ComposeMode,
+): Promise<DraftDetail | SendResult> {
+  const { client } = ctx;
+
+  if (params.mode === 'send_draft') {
+    const result = await client.drafts.send(params.draft_id);
+    return {
+      message_id: result.id ?? '',
+      thread_id: result.threadId ?? null,
+      message: `Draft sent successfully. Message ID: ${result.id ?? 'unknown'}.`,
+    };
+  }
+
+  if (params.mode === 'send') {
+    const raw = buildRfc2822Message(params);
+    const encoded = Buffer.from(raw).toString('base64url');
+    const result = await client.messages.send(encoded, params.thread_id);
+    return {
+      message_id: result.id ?? '',
+      thread_id: result.threadId ?? null,
+      message: `Message sent to ${params.to}. Message ID: ${result.id ?? 'unknown'}.`,
+    };
+  }
+
+  // draft or update_draft — both produce a DraftDetail
+  const raw = buildRfc2822Message(params);
   const encoded = Buffer.from(raw).toString('base64url');
-  const draft = await client.drafts.create(encoded, options.threadId);
+
+  const draft =
+    params.mode === 'update_draft'
+      ? await client.drafts.update(params.draft_id, encoded, params.thread_id)
+      : await client.drafts.create(encoded, params.thread_id);
 
   const msg = draft.message;
   const headers = headerMap(msg?.payload?.headers ?? []);
@@ -120,16 +143,17 @@ export async function createDraft(
 }
 
 // ---------------------------------------------------------------------------
-// Delete
+// deleteDraft — unchanged
 // ---------------------------------------------------------------------------
 
 /**
  * Permanently delete a draft message.
- * @param client - The authenticated Gmail API client
+ * @param ctx - The authenticated Gmail context
  * @param draftId - The draft ID to delete
  * @returns The deletion result indicating success or failure
  */
-export async function deleteDraft(client: GmailClient, draftId: string): Promise<DeleteResult> {
+export async function deleteDraft(ctx: GmailContext, draftId: string): Promise<DeleteResult> {
+  const { client } = ctx;
   try {
     await client.drafts.delete(draftId);
     return { deleted: true, message: `Draft ${draftId} permanently deleted.` };
@@ -139,23 +163,4 @@ export async function deleteDraft(client: GmailClient, draftId: string): Promise
       message: `Failed to delete draft: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
-}
-
-// ---------------------------------------------------------------------------
-// Send
-// ---------------------------------------------------------------------------
-
-/**
- * Send a previously created draft.
- * @param client - The authenticated Gmail API client
- * @param draftId - The draft ID to send
- * @returns The send result with the new message and thread IDs
- */
-export async function sendDraft(client: GmailClient, draftId: string): Promise<SendResult> {
-  const result = await client.drafts.send(draftId);
-  return {
-    message_id: result.id ?? '',
-    thread_id: result.threadId ?? null,
-    message: `Draft sent successfully. Message ID: ${result.id ?? 'unknown'}.`,
-  };
 }

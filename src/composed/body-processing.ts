@@ -17,7 +17,7 @@
 import { convert as htmlToText } from 'html-to-text';
 import PostalMime from 'postal-mime';
 import he from 'he';
-import { logger } from '../logger.js';
+import { logger } from '../shared/index.js';
 
 const log = logger.child('composed:body-processing');
 

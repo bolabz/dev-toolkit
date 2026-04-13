@@ -6,8 +6,12 @@
 
 import type { gmail_v1 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-import PQueue from 'p-queue';
 import { z } from 'zod';
+
+// Warning: (ae-forgotten-export) The symbol "AccountContextSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type AccountContext = z.infer<typeof AccountContextSchema>;
 
 // Warning: (ae-forgotten-export) The symbol "AccountOverviewSchema" needs to be exported by the entry point index.d.ts
 //
@@ -32,6 +36,11 @@ export interface AuthOptions {
 // @public
 export function beginAuthFlow(credentialsPath: string, tokenPath: string): PendingAuth;
 
+// Warning: (ae-forgotten-export) The symbol "ComposeModeSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type ComposeMode = z.infer<typeof ComposeModeSchema>;
+
 // Warning: (ae-forgotten-export) The symbol "ContactSchema" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -39,6 +48,11 @@ export type Contact = z.infer<typeof ContactSchema>;
 
 // @public
 export function createGmailContext(credentialsPath: string, tokenPath: string): Promise<GmailContext>;
+
+// Warning: (ae-forgotten-export) The symbol "DateRangeSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type DateRange = z.infer<typeof DateRangeSchema>;
 
 // Warning: (ae-forgotten-export) The symbol "DeleteFilterResultSchema" needs to be exported by the entry point index.d.ts
 //
@@ -103,17 +117,6 @@ export type FullMessage = z.infer<typeof FullMessageSchema>;
 // @public
 export type FullThread = z.infer<typeof FullThreadSchema>;
 
-// Warning: (ae-forgotten-export) The symbol "ToolName" needs to be exported by the entry point index.d.ts
-// Warning: (ae-forgotten-export) The symbol "ToolConfig" needs to be exported by the entry point index.d.ts
-//
-// @public
-export function getEnabledTools(): [ToolName, ToolConfig][];
-
-// Warning: (ae-forgotten-export) The symbol "ToolCategory" needs to be exported by the entry point index.d.ts
-//
-// @public
-export function getToolsByCategory(): Record<ToolCategory, ToolName[]>;
-
 // @public
 export class GmailApiError extends Error {
     constructor(operation: string, cause: unknown);
@@ -124,87 +127,22 @@ export class GmailApiError extends Error {
 
 // @public
 export interface GmailContext {
-    // Warning: (ae-forgotten-export) The symbol "GmailClient" needs to be exported by the entry point index.d.ts
-    readonly client: GmailClient;
-    // Warning: (ae-forgotten-export) The symbol "LabelCache" needs to be exported by the entry point index.d.ts
-    readonly labelCache: LabelCache;
+    // Warning: (ae-forgotten-export) The symbol "IGmailClient" needs to be exported by the entry point index.d.ts
+    readonly client: IGmailClient;
+    // Warning: (ae-forgotten-export) The symbol "IFilterCache" needs to be exported by the entry point index.d.ts
+    readonly filterCache: IFilterCache;
+    // Warning: (ae-forgotten-export) The symbol "ILabelCache" needs to be exported by the entry point index.d.ts
+    readonly labelCache: ILabelCache;
+    // Warning: (ae-forgotten-export) The symbol "IDataCache" needs to be exported by the entry point index.d.ts
+    // Warning: (ae-forgotten-export) The symbol "CachedSettings" needs to be exported by the entry point index.d.ts
+    readonly settingsCache: IDataCache<CachedSettings>;
 }
 
+// Warning: (ae-forgotten-export) The symbol "ComposedClient" needs to be exported by the entry point index.d.ts
+//
 // @public
-export class GmailToolkit {
+export class GmailToolkit extends ComposedClient {
     static create(options?: GmailToolkitOptions): Promise<GmailToolkit>;
-    createDraft(options: {
-        body: string;
-        to?: string;
-        subject?: string;
-        cc?: string;
-        bcc?: string;
-        contentType?: 'text/plain' | 'text/html';
-        threadId?: string;
-    }): Promise<DraftDetail>;
-    createFilter(criteria: {
-        from?: string;
-        to?: string;
-        subject?: string;
-        query?: string;
-        has_attachment?: boolean;
-    }, actions: {
-        add_labels?: string[];
-        remove_labels?: string[];
-        forward_to?: string;
-        skip_inbox?: boolean;
-        mark_read?: boolean;
-    }): Promise<FilterDetail>;
-    createLabel(name: string, options?: {
-        color?: {
-            text: string;
-            background: string;
-        };
-    }): Promise<LabelDetail>;
-    deleteDraft(draftId: string): Promise<DeleteResult>;
-    deleteFilter(filterId: string): Promise<DeleteFilterResult>;
-    deleteLabel(nameOrId: string): Promise<DeleteLabelResult>;
-    getAccount(): Promise<AccountOverview>;
-    getDrafts(maxResults?: number, query?: string, includeBody?: boolean): Promise<DraftSummary>;
-    getFilters(): Promise<FilterOverview>;
-    getHistory(sinceHistoryId: string, maxResults?: number, pageToken?: string): Promise<HistoryResult>;
-    getLabels(): Promise<LabelOverview>;
-    modifyMessages(messageIds: string[], options: {
-        addLabels?: string[];
-        removeLabels?: string[];
-    }): Promise<ModifyResult>;
-    modifyThread(threadId: string, options: {
-        addLabels?: string[];
-        removeLabels?: string[];
-    }): Promise<ModifyResult>;
-    readMessage(messageId: string, includeHtml?: boolean): Promise<FullMessage>;
-    readThread(threadId: string): Promise<FullThread>;
-    search(query: string, maxResults?: number, pageToken?: string, includeBody?: boolean): Promise<SearchResult>;
-    searchAndModify(query: string, options: {
-        addLabels?: string[];
-        removeLabels?: string[];
-        maxMessages?: number;
-    }): Promise<ModifyResult>;
-    searchThreads(query: string, maxResults?: number, pageToken?: string, enrich?: boolean): Promise<ThreadSearchResult>;
-    sendDraft(draftId: string): Promise<SendResult>;
-    sendMessage(options: {
-        to: string;
-        subject: string;
-        body: string;
-        cc?: string;
-        bcc?: string;
-        contentType?: string;
-        threadId?: string;
-    }): Promise<SendResult>;
-    trashMessages(messageIds: string[]): Promise<ModifyResult>;
-    trashThread(threadId: string): Promise<ModifyResult>;
-    updateLabel(nameOrId: string, updates: {
-        new_name?: string;
-        color?: {
-            text: string;
-            background: string;
-        };
-    }): Promise<LabelDetail>;
 }
 
 // Warning: (ae-forgotten-export) The symbol "GmailToolkitErrorSchema" needs to be exported by the entry point index.d.ts
@@ -247,10 +185,20 @@ export type LabelDetail = z.infer<typeof LabelDetailSchema>;
 // @public
 export type LabelOverview = z.infer<typeof LabelOverviewSchema>;
 
+// Warning: (ae-forgotten-export) The symbol "MatchedMessageSummarySchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type MatchedMessageSummary = z.infer<typeof MatchedMessageSummarySchema>;
+
 // Warning: (ae-forgotten-export) The symbol "MessageSummarySchema" needs to be exported by the entry point index.d.ts
 //
 // @public
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
+
+// Warning: (ae-forgotten-export) The symbol "MessageWithContextSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type MessageWithContext = z.infer<typeof MessageWithContextSchema>;
 
 // @public
 export class MissingCredentialsError extends Error {
@@ -268,8 +216,15 @@ export interface PendingAuth {
     readonly url: string;
 }
 
+// Warning: (ae-forgotten-export) The symbol "SearchAllResultSchema" needs to be exported by the entry point index.d.ts
+//
 // @public
-export function resolveToolRegistry(): Record<ToolName, ToolConfig>;
+export type SearchAllResult = z.infer<typeof SearchAllResultSchema>;
+
+// Warning: (ae-forgotten-export) The symbol "SearchCriteriaInputSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type SearchCriteriaInput = z.infer<typeof SearchCriteriaInputSchema>;
 
 // Warning: (ae-forgotten-export) The symbol "SearchResultSchema" needs to be exported by the entry point index.d.ts
 //
@@ -285,6 +240,16 @@ export type SearchSummary = z.infer<typeof SearchSummarySchema>;
 //
 // @public
 export type SendResult = z.infer<typeof SendResultSchema>;
+
+// Warning: (ae-forgotten-export) The symbol "ThreadContextSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type ThreadContext = z.infer<typeof ThreadContextSchema>;
+
+// Warning: (ae-forgotten-export) The symbol "ThreadMatchSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type ThreadMatch = z.infer<typeof ThreadMatchSchema>;
 
 // Warning: (ae-forgotten-export) The symbol "ThreadSearchResultSchema" needs to be exported by the entry point index.d.ts
 //

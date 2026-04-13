@@ -8,21 +8,36 @@
 
 import type { OAuth2Client } from 'google-auth-library';
 import PQueue from 'p-queue';
-import { RATE_LIMIT_CONFIG } from './base.js';
-import { MessagesClient } from './messages.js';
-import { ThreadsClient } from './threads.js';
-import { LabelsClient } from './labels.js';
-import { DraftsClient } from './drafts.js';
-import { FiltersClient } from './filters.js';
-import { SettingsClient } from './settings.js';
-import { HistoryClient } from './history.js';
+import { RATE_LIMIT_CONFIG, QuotaBucket } from './base.js';
+import { MessagesClient, type IMessagesClient } from './messages.js';
+import { ThreadsClient, type IThreadsClient } from './threads.js';
+import { LabelsClient, type ILabelsClient } from './labels.js';
+import { DraftsClient, type IDraftsClient } from './drafts.js';
+import { FiltersClient, type IFiltersClient } from './filters.js';
+import { SettingsClient, type ISettingsClient } from './settings.js';
+import { HistoryClient, type IHistoryClient } from './history.js';
+
+/**
+ * Public contract for the composed Gmail API client.
+ * Implemented by GmailClient. Use this type in GmailContext and tests
+ * to enable substitution with test doubles.
+ */
+export interface IGmailClient {
+  readonly messages: IMessagesClient;
+  readonly threads: IThreadsClient;
+  readonly labels: ILabelsClient;
+  readonly drafts: IDraftsClient;
+  readonly filters: IFiltersClient;
+  readonly settings: ISettingsClient;
+  readonly history: IHistoryClient;
+}
 
 /**
  * Façade that composes all Gmail API resource clients into a single object.
  * All sub-clients share one authenticated OAuth2 client and one rate-limiting
  * PQueue to stay within Gmail's 250 quota-units/second limit.
  */
-export class GmailClient {
+export class GmailClient implements IGmailClient {
   readonly messages: MessagesClient;
   readonly threads: ThreadsClient;
   readonly labels: LabelsClient;
@@ -32,19 +47,19 @@ export class GmailClient {
   readonly history: HistoryClient;
 
   /**
-   * Create a new GmailClient with authenticated sub-clients sharing a rate limiter.
+   * Create a new GmailClient with authenticated sub-clients sharing a
+   * concurrency limiter (PQueue) and quota-unit rate limiter (QuotaBucket).
    * @param auth - The authenticated OAuth2 client for Gmail API access
    */
   constructor(auth: OAuth2Client) {
-    // Single shared rate limiter across all resource clients to prevent
-    // exceeding Gmail's 250 quota units/second limit
     const sharedQueue = new PQueue(RATE_LIMIT_CONFIG);
-    this.messages = new MessagesClient(auth, sharedQueue);
-    this.threads = new ThreadsClient(auth, sharedQueue);
-    this.labels = new LabelsClient(auth, sharedQueue);
-    this.drafts = new DraftsClient(auth, sharedQueue);
-    this.filters = new FiltersClient(auth, sharedQueue);
-    this.settings = new SettingsClient(auth, sharedQueue);
-    this.history = new HistoryClient(auth, sharedQueue);
+    const sharedBucket = new QuotaBucket();
+    this.messages = new MessagesClient(auth, sharedQueue, sharedBucket);
+    this.threads = new ThreadsClient(auth, sharedQueue, sharedBucket);
+    this.labels = new LabelsClient(auth, sharedQueue, sharedBucket);
+    this.drafts = new DraftsClient(auth, sharedQueue, sharedBucket);
+    this.filters = new FiltersClient(auth, sharedQueue, sharedBucket);
+    this.settings = new SettingsClient(auth, sharedQueue, sharedBucket);
+    this.history = new HistoryClient(auth, sharedQueue, sharedBucket);
   }
 }

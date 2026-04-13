@@ -5,17 +5,14 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { GmailContext } from '../composed/context.js';
-import { getLabels, getAccount } from '../composed/index.js';
+import type { ComposedClient } from './base.js';
 
 /**
  * Register all MCP resources.
  * @param server - The MCP server instance
- * @param context - The authenticated Gmail context
+ * @param composed - The composed Layer 2 client
  */
-export function registerResources(server: McpServer, context: GmailContext): void {
-  const { client, labelCache } = context;
-
+export function registerResources(server: McpServer, composed: ComposedClient): void {
   server.registerResource(
     'labels',
     'gmail://labels',
@@ -24,7 +21,7 @@ export function registerResources(server: McpServer, context: GmailContext): voi
         'All Gmail labels with IDs, names, types, and counts. Use to resolve label names and understand organizational structure.',
     },
     async () => {
-      const result = await getLabels(client, labelCache);
+      const result = await composed.getLabels();
       return {
         contents: [
           {
@@ -42,7 +39,7 @@ export function registerResources(server: McpServer, context: GmailContext): voi
     'gmail://profile',
     { description: 'Account email, total message/thread counts, history ID.' },
     async () => {
-      const account = await getAccount(client);
+      const account = await composed.getAccountContext();
       return {
         contents: [
           {

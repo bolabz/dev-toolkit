@@ -40,122 +40,80 @@ export type ToolName = keyof typeof DEFAULT_TOOL_REGISTRY;
 // ---------------------------------------------------------------------------
 
 const DEFAULT_TOOL_REGISTRY = {
-  // === Reads (always enabled) ===
+  // === Read (4) ===
+  gmail_account: {
+    enabled: true,
+    category: 'read' as const,
+    description: 'Get full account context: profile, labels, filters, and settings in one call',
+  },
   gmail_search: {
     enabled: true,
     category: 'read' as const,
     description:
-      'Search messages by Gmail query string and/or structured filter criteria (from, to, subject, etc.). Set include_body=true to get processed body text inline.',
+      'Search all messages with rich filtering (dates, labels, status, filter criteria). Returns messages grouped by thread.',
   },
-  gmail_read_message: {
+  gmail_read: {
     enabled: true,
     category: 'read' as const,
-    description: 'Read a single message with processed body text',
-  },
-  gmail_read_thread: {
-    enabled: true,
-    category: 'read' as const,
-    description: 'Read an entire thread with all messages in chronological order',
-  },
-  gmail_get_labels: {
-    enabled: true,
-    category: 'read' as const,
-    description: 'Get all labels with message/thread counts and summary analytics',
+    description:
+      'Read messages by ID with full body text and thread context (position, participants, date range)',
   },
   gmail_get_drafts: {
     enabled: true,
     category: 'read' as const,
-    description: 'List drafts with metadata (to, subject, date, etc.)',
-  },
-  gmail_get_filters: {
-    enabled: true,
-    category: 'read' as const,
-    description: 'List all filters with resolved label names and derived flags',
-  },
-  gmail_get_account: {
-    enabled: true,
-    category: 'read' as const,
-    description:
-      'Get account overview: profile, vacation, forwarding, aliases, delegates, IMAP/POP',
-  },
-  gmail_search_threads: {
-    enabled: true,
-    category: 'read' as const,
-    description:
-      'Search thread summaries by Gmail query. Set enrich=true for message counts, subjects, and participants. Use gmail_read_thread for full message bodies.',
-  },
-  gmail_get_history: {
-    enabled: true,
-    category: 'read' as const,
-    description:
-      'Get mailbox change events since a history ID (incremental sync). Pass history_id from a previous getAccount or readMessage call.',
+    description: 'List all drafts with metadata and optional body text',
   },
 
-  // === Non-destructive writes (enabled by default) ===
+  // === Create (3) ===
+  gmail_compose: {
+    enabled: false,
+    category: 'destructive' as const,
+    description: 'Create draft, update draft, send message, or send draft (4 modes)',
+  },
   gmail_create_label: {
     enabled: true,
     category: 'write' as const,
     description: 'Create a new label (supports nested labels with "/" separator)',
-  },
-  gmail_update_label: {
-    enabled: true,
-    category: 'write' as const,
-    description: 'Update a label name or color',
-  },
-  gmail_modify_messages: {
-    enabled: true,
-    category: 'write' as const,
-    description:
-      'Add/remove labels on messages by ID or by search query. Use query mode to retroactively apply filter-like actions to existing messages.',
-  },
-  gmail_modify_thread: {
-    enabled: true,
-    category: 'write' as const,
-    description: 'Add/remove labels on an entire thread',
-  },
-  gmail_create_draft: {
-    enabled: true,
-    category: 'write' as const,
-    description: 'Create a new draft email (optionally as a reply to a thread)',
   },
   gmail_create_filter: {
     enabled: true,
     category: 'write' as const,
     description: 'Create a new filter rule with criteria and actions',
   },
-  gmail_delete_label: {
+
+  // === Update (3) ===
+  gmail_modify: {
+    enabled: true,
+    category: 'write' as const,
+    description: 'Add/remove labels on messages by IDs, thread IDs, or search query',
+  },
+  gmail_update_label: {
+    enabled: true,
+    category: 'write' as const,
+    description: 'Update a label name or color',
+  },
+  gmail_update_filter: {
     enabled: true,
     category: 'write' as const,
     description:
-      'Delete a label (messages are NOT deleted, just un-labeled). Returns count of affected messages.',
+      'Update a filter (atomic delete+recreate with merged criteria/actions). Retroactively applies to existing messages.',
+  },
+
+  // === Delete (4) ===
+  gmail_trash: {
+    enabled: false,
+    category: 'destructive' as const,
+    description: 'Move messages or threads to Trash (recoverable within 30 days)',
+  },
+  gmail_delete_label: {
+    enabled: true,
+    category: 'write' as const,
+    description: 'Delete a label (messages are NOT deleted, just un-labeled)',
   },
   gmail_delete_filter: {
     enabled: true,
     category: 'write' as const,
-    description:
-      'Delete a filter rule (stops future auto-processing). Returns summary of deleted filter criteria.',
-  },
-
-  // === Destructive (disabled by default, opt-in) ===
-  gmail_send_draft: {
-    enabled: false,
-    category: 'destructive' as const,
-    description: 'Send an existing draft (irreversible — email is delivered)',
-  },
-  gmail_send_message: {
-    enabled: false,
-    category: 'destructive' as const,
-    description: 'Send a new email directly (irreversible — email is delivered)',
-  },
-  gmail_trash_messages: {
-    enabled: false,
-    category: 'destructive' as const,
-    description: 'Move messages to Trash (recoverable within 30 days)',
-  },
-  gmail_trash_thread: {
-    enabled: false,
-    category: 'destructive' as const,
-    description: 'Move an entire thread to Trash (recoverable within 30 days)',
+    description: 'Delete a filter rule (stops future auto-processing)',
   },
   gmail_delete_draft: {
     enabled: false,
@@ -198,34 +156,6 @@ export function resolveToolRegistry(): Record<ToolName, ToolConfig> {
   });
 
   return registry;
-}
-
-/**
- * Returns only the tools that are currently enabled.
- * @returns An array of [name, config] pairs for enabled tools
- */
-export function getEnabledTools(): [ToolName, ToolConfig][] {
-  const registry = resolveToolRegistry();
-  return (Object.entries(registry) as [ToolName, ToolConfig][]).filter(
-    ([, config]) => config.enabled,
-  );
-}
-
-/**
- * Returns all tool names grouped by category.
- * @returns A record mapping each category to its tool names
- */
-export function getToolsByCategory(): Record<ToolCategory, ToolName[]> {
-  const registry = resolveToolRegistry();
-  return (Object.entries(registry) as [ToolName, ToolConfig][]).reduce<
-    Record<ToolCategory, ToolName[]>
-  >(
-    (acc, [name, config]) => {
-      acc[config.category].push(name);
-      return acc;
-    },
-    { read: [], write: [], destructive: [] },
-  );
 }
 
 // ---------------------------------------------------------------------------

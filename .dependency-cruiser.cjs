@@ -4,7 +4,7 @@ module.exports = {
   forbidden: [
     // --- Layer boundary enforcement ---
     // Architecture: Layer 1 (client/) ← Layer 2 (composed/) ← Layer 3 (mcp-server/)
-    // Cross-cutting modules (auth, errors, logger, types) are accessible from any layer.
+    // Cross-cutting modules (shared/auth, shared/errors, shared/logger, shared/types) are accessible from any layer.
     {
       name: 'layer-1-cannot-import-layer-2',
       severity: 'error',
@@ -41,6 +41,13 @@ module.exports = {
       from: { path: '^src/index\\.ts$' },
       to: { path: '^src/client/' },
     },
+    {
+      name: 'public-api-cannot-import-layer-3',
+      severity: 'error',
+      comment: 'Public API must not depend on MCP server (Layer 3).',
+      from: { path: '^src/index\\.ts$' },
+      to: { path: '^src/mcp-server' },
+    },
   ],
   options: {
     includeOnly: '^src/',
@@ -54,6 +61,7 @@ module.exports = {
           '^src/client/[^/]+',
           '^src/composed/[^/]+',
           '^src/mcp-server/[^/]+',
+          '^src/shared/[^/]+',
           'node_modules/(@[^/]+/[^/]+|[^/]+)',
         ],
       },

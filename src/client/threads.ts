@@ -5,8 +5,7 @@
  */
 
 import type { gmail_v1 } from 'googleapis';
-import { GmailClientBase } from './base.js';
-import type { MessageFormat } from './messages.js';
+import { GmailClientBase, type MessageFormat } from './base.js';
 
 /** Query options for listing Gmail threads. */
 export interface ListThreadsOptions {
@@ -17,8 +16,55 @@ export interface ListThreadsOptions {
   includeSpamTrash?: boolean;
 }
 
+/** Options for auto-paginated thread listing (pageToken handled internally). */
+export interface ListAllThreadsOptions {
+  query?: string;
+  maxResults?: number;
+  labelIds?: string[];
+  includeSpamTrash?: boolean;
+  maxPages?: number;
+}
+
+/** Public contract for Gmail thread operations. */
+export interface IThreadsClient {
+  /** List thread summaries matching a query with pagination. */
+  list: (options?: ListThreadsOptions) => Promise<{
+    threads: { id: string; snippet: string; historyId: string }[];
+    nextPageToken: string | null;
+    resultSizeEstimate: number;
+  }>;
+  /** List all thread summaries matching a query, auto-paginating through all pages. */
+  listAll: (
+    options?: ListAllThreadsOptions,
+  ) => Promise<{ id: string; snippet: string; historyId: string }[]>;
+  /** Get a full thread by ID with all messages. */
+  get: (
+    id: string,
+    format?: MessageFormat,
+    metadataHeaders?: string[],
+  ) => Promise<gmail_v1.Schema$Thread>;
+  /** Get multiple threads by ID concurrently through the rate limiter. */
+  batchGet: (
+    ids: string[],
+    format?: MessageFormat,
+    metadataHeaders?: string[],
+  ) => Promise<gmail_v1.Schema$Thread[]>;
+  /** Modify labels on all messages in a thread. */
+  modify: (
+    id: string,
+    addLabelIds?: string[],
+    removeLabelIds?: string[],
+  ) => Promise<gmail_v1.Schema$Thread>;
+  /** Move a thread to Trash (recoverable for 30 days). */
+  trash: (id: string) => Promise<gmail_v1.Schema$Thread>;
+  /** Recover a thread from Trash. */
+  untrash: (id: string) => Promise<gmail_v1.Schema$Thread>;
+  /** Permanently delete a thread (cannot be undone). */
+  delete: (id: string) => Promise<void>;
+}
+
 /** Client for Gmail threads.* API endpoints with rate limiting. */
-export class ThreadsClient extends GmailClientBase {
+export class ThreadsClient extends GmailClientBase implements IThreadsClient {
   /**
    * List thread summaries matching a query.
    * @param options - Query, pagination, and filter options
@@ -51,6 +97,35 @@ export class ThreadsClient extends GmailClientBase {
       nextPageToken: response.data.nextPageToken ?? null,
       resultSizeEstimate: response.data.resultSizeEstimate ?? 0,
     };
+  }
+
+  /**
+   * List all thread summaries matching a query, auto-paginating through all pages.
+   * @param options - Query, filter, and pagination options
+   * @returns All matching thread summaries
+   */
+  async listAll(
+    options: ListAllThreadsOptions = {},
+  ): Promise<{ id: string; snippet: string; historyId: string }[]> {
+    return this.paginate(
+      (pageToken) =>
+        this.gmail.users.threads.list({
+          userId: this.userId,
+          q: options.query,
+          maxResults: options.maxResults ?? 500,
+          pageToken,
+          labelIds: options.labelIds,
+          includeSpamTrash: options.includeSpamTrash ?? false,
+        }),
+      (response) =>
+        response.data.threads?.map((t) => ({
+          id: t.id ?? '',
+          snippet: t.snippet ?? '',
+          historyId: t.historyId ?? '',
+        })),
+      options.maxPages ?? 50,
+      'threads.listAll',
+    );
   }
 
   /**

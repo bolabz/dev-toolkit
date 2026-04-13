@@ -6,13 +6,8 @@
  */
 
 import type { gmail_v1 } from 'googleapis';
-import type { Contact, FullMessage, AttachmentInfo } from '../types.js';
-import type { LabelCache } from './label-cache.js';
-import { processMessagePayload } from './body-processing.js';
-import { logger } from '../logger.js';
+import type { Contact } from '../shared/index.js';
 import he from 'he';
-
-const log = logger.child('composed:helpers');
 
 /**
  * Parse a single email contact string into a Contact object.
@@ -28,17 +23,17 @@ export function parseContact(raw: string): Contact {
   const match = /^(.+?)\s*<([^>]+)>$/.exec(trimmed);
   if (match) {
     const name = match[1].replace(/^["']|["']$/g, '').trim();
-    return { name: name || null, email: match[2].trim() };
+    return { name: name || null, email: match[2].trim().toLowerCase() };
   }
 
   // "<email@example.com>"
   const angleMatch = /^<([^>]+)>$/.exec(trimmed);
   if (angleMatch) {
-    return { name: null, email: angleMatch[1].trim() };
+    return { name: null, email: angleMatch[1].trim().toLowerCase() };
   }
 
   // Plain email
-  return { name: null, email: trimmed };
+  return { name: null, email: trimmed.toLowerCase() };
 }
 
 /**
@@ -143,8 +138,7 @@ export function headerMap(headers: gmail_v1.Schema$MessagePartHeader[]): Map<str
 export function parseDate(dateStr: string): string {
   try {
     return new Date(dateStr).toISOString();
-  } catch (err) {
-    log.debug(`Failed to parse date "${dateStr}", returning raw string`, err);
+  } catch {
     return dateStr;
   }
 }
@@ -211,6 +205,82 @@ export function hasAttachments(
   }
 
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Message Field Normalization
+// ---------------------------------------------------------------------------
+
+/**
+ * Common message fields shared by both MessageSummary and FullMessage.
+ * Produced by normalizeMessageFields — the single source of truth for
+ * header parsing, date resolution, and flag extraction.
+ *
+ * Note: `history_id` and `web_url` are intentionally omitted here.
+ * They are added explicitly by `transformMessage` for FullMessage results.
+ * List/search callers (MessageSummary) do not include them to reduce payload size.
+ */
+export interface NormalizedMessageFields {
+  id: string;
+  thread_id: string;
+  from: Contact;
+  to: Contact[];
+  /** Absent when the message has no CC recipients. */
+  cc?: Contact[];
+  subject: string;
+  date: string;
+  labels: string[];
+  is_unread: boolean;
+  is_starred: boolean;
+  is_mailing_list: boolean;
+  /** Absent when the message has no Reply-To header. */
+  reply_to?: Contact;
+  size_bytes: number;
+}
+
+/**
+ * Normalize a raw Gmail API message into common fields shared by all
+ * message representations. Pure function — no async, no cache, no body
+ * processing. Callers add type-specific fields (body, attachments, snippet).
+ *
+ * Single source of truth for: internalDate preference over Date header,
+ * Reply-To parsing, contact extraction, and label flag derivation.
+ * @param raw - The raw Gmail API message object
+ * @param resolvedLabels - Pre-resolved human-readable label names
+ * @returns Normalized fields common to MessageSummary and FullMessage
+ */
+export function normalizeMessageFields(
+  raw: gmail_v1.Schema$Message,
+  resolvedLabels: string[],
+): NormalizedMessageFields {
+  const headers = headerMap(raw.payload?.headers ?? []);
+  const labelIds = raw.labelIds ?? [];
+
+  const date =
+    raw.internalDate != null
+      ? new Date(Number(raw.internalDate)).toISOString()
+      : parseDate(headers.get('Date') ?? '');
+
+  const replyToRaw = headers.get('Reply-To');
+  const replyTo = replyToRaw != null && replyToRaw !== '' ? parseContact(replyToRaw) : undefined;
+
+  const cc = parseContactList(headers.get('Cc') ?? '');
+
+  return {
+    id: raw.id ?? '',
+    thread_id: raw.threadId ?? '',
+    from: parseContact(headers.get('From') ?? ''),
+    to: parseContactList(headers.get('To') ?? ''),
+    ...(cc.length > 0 ? { cc } : {}),
+    subject: headers.get('Subject') ?? '(no subject)',
+    date,
+    labels: resolvedLabels,
+    is_unread: labelIds.includes('UNREAD'),
+    is_starred: labelIds.includes('STARRED'),
+    is_mailing_list: headers.has('List-Unsubscribe'),
+    ...(replyTo != null ? { reply_to: replyTo } : {}),
+    size_bytes: raw.sizeEstimate ?? 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -284,102 +354,4 @@ export function buildRfc2822Message(options: {
  */
 export function formatLabelChanges(addLabels: string[], removeLabels: string[]): string {
   return `${addLabels.length > 0 ? ` Added: ${addLabels.join(', ')}.` : ''}${removeLabels.length > 0 ? ` Removed: ${removeLabels.join(', ')}.` : ''}`;
-}
-
-// ---------------------------------------------------------------------------
-// Message Transformation
-// ---------------------------------------------------------------------------
-
-/**
- * Transform a raw Gmail API message into a fully resolved FullMessage.
- * Resolves label IDs to names, processes body through the text pipeline,
- * and extracts attachment metadata.
- * @param raw - The raw Gmail API message object
- * @param labelCache - The label cache for resolving label IDs to names
- * @param options - Processing options for body text extraction
- * @param options.stripReplies - Whether to strip quoted reply chains from body text
- * @param options.includeHtml - Whether to include raw HTML alongside plain text
- * @returns A fully resolved message with parsed contacts, labels, and body
- */
-export async function transformMessage(
-  raw: gmail_v1.Schema$Message,
-  labelCache: LabelCache,
-  options: { stripReplies: boolean; includeHtml: boolean },
-): Promise<FullMessage> {
-  const headers = headerMap(raw.payload?.headers ?? []);
-  const labelIds = raw.labelIds ?? [];
-  const resolvedLabels = await labelCache.resolve(labelIds);
-
-  // Process body through pipeline
-  const { text, html } = await processMessagePayload(
-    raw.payload ?? {},
-    raw.payload?.mimeType ?? undefined,
-    options,
-  );
-
-  // Prefer Gmail's internalDate (set on receipt) over the sender Date header
-  const date =
-    raw.internalDate != null
-      ? new Date(Number(raw.internalDate)).toISOString()
-      : parseDate(headers.get('Date') ?? '');
-
-  // Reply-To overrides From for replies (mailing lists, no-reply senders, etc.)
-  const replyToRaw = headers.get('Reply-To');
-  const replyTo = replyToRaw != null && replyToRaw !== '' ? parseContact(replyToRaw) : null;
-
-  return {
-    id: raw.id ?? '',
-    thread_id: raw.threadId ?? '',
-    from: parseContact(headers.get('From') ?? ''),
-    to: parseContactList(headers.get('To') ?? ''),
-    cc: parseContactList(headers.get('Cc') ?? ''),
-    bcc: parseContactList(headers.get('Bcc') ?? ''),
-    reply_to: replyTo,
-    subject: headers.get('Subject') ?? '(no subject)',
-    date,
-    labels: resolvedLabels,
-    is_unread: labelIds.includes('UNREAD'),
-    is_starred: labelIds.includes('STARRED'),
-    is_mailing_list: headers.has('List-Unsubscribe'),
-    body_text: text,
-    body_html: html,
-    attachments: extractAttachments(raw.payload),
-    size_bytes: raw.sizeEstimate ?? 0,
-    history_id: raw.historyId ?? '',
-    web_url: gmailWebUrl(raw.id ?? ''),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Attachment Extraction
-// ---------------------------------------------------------------------------
-
-/**
- * Extract attachment metadata from a Gmail message payload.
- * Recursively walks the MIME tree to find parts with filenames.
- * @param payload - The Gmail message payload to inspect for attachments
- * @returns An array of attachment metadata (id, filename, MIME type, size)
- */
-function extractAttachments(payload: gmail_v1.Schema$MessagePart | undefined): AttachmentInfo[] {
-  const attachments: AttachmentInfo[] = [];
-  if (!payload) {
-    return attachments;
-  }
-
-  function walk(part: gmail_v1.Schema$MessagePart) {
-    if (part.filename != null && part.filename.length > 0) {
-      attachments.push({
-        id: part.body?.attachmentId ?? '',
-        filename: part.filename,
-        mime_type: part.mimeType ?? 'application/octet-stream',
-        size_bytes: part.body?.size ?? 0,
-      });
-    }
-    for (const child of part.parts ?? []) {
-      walk(child);
-    }
-  }
-
-  walk(payload);
-  return attachments;
 }

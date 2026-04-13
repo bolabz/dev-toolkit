@@ -5,11 +5,38 @@
  */
 
 import type { gmail_v1 } from 'googleapis';
-import { GmailClientBase } from './base.js';
-import type { MessageFormat } from './messages.js';
+import { GmailClientBase, type MessageFormat } from './base.js';
+
+/** Public contract for Gmail draft operations. */
+export interface IDraftsClient {
+  /** List draft message summaries with optional filtering. */
+  list: (options?: { maxResults?: number; pageToken?: string; query?: string }) => Promise<{
+    drafts: { id: string; messageId: string }[];
+    nextPageToken: string | null;
+    resultSizeEstimate: number;
+  }>;
+  /** Auto-paginate all drafts matching the query. */
+  listAll: (options?: {
+    query?: string;
+    maxResults?: number;
+    maxPages?: number;
+  }) => Promise<{ id: string; messageId: string }[]>;
+  /** Get a single draft by ID with its full message content. */
+  get: (id: string, format?: MessageFormat) => Promise<gmail_v1.Schema$Draft>;
+  /** Get multiple drafts by ID concurrently through the rate limiter. */
+  batchGet: (ids: string[], format?: MessageFormat) => Promise<gmail_v1.Schema$Draft[]>;
+  /** Create a new draft from a base64url-encoded RFC 2822 message. */
+  create: (raw: string, threadId?: string) => Promise<gmail_v1.Schema$Draft>;
+  /** Replace the content of an existing draft. */
+  update: (id: string, raw: string, threadId?: string) => Promise<gmail_v1.Schema$Draft>;
+  /** Send a draft, delivering it to its recipients. */
+  send: (id: string) => Promise<gmail_v1.Schema$Message>;
+  /** Permanently delete a draft (cannot be undone). */
+  delete: (id: string) => Promise<void>;
+}
 
 /** Client for Gmail drafts.* API endpoints with rate limiting. */
-export class DraftsClient extends GmailClientBase {
+export class DraftsClient extends GmailClientBase implements IDraftsClient {
   /**
    * List draft message summaries with optional filtering.
    * @param options - Pagination and filter options
@@ -42,6 +69,35 @@ export class DraftsClient extends GmailClientBase {
       nextPageToken: response.data.nextPageToken ?? null,
       resultSizeEstimate: response.data.resultSizeEstimate ?? 0,
     };
+  }
+
+  /**
+   * Auto-paginate all drafts matching the optional query.
+   * @param options - Pagination and filter options
+   * @param options.query - Gmail search query to filter drafts
+   * @param options.maxResults - Maximum drafts per page (default 100)
+   * @param options.maxPages - Maximum pages to fetch (default 10, ~1,000 drafts)
+   * @returns All draft ID/message pairs across all pages
+   */
+  async listAll(
+    options: { query?: string; maxResults?: number; maxPages?: number } = {},
+  ): Promise<{ id: string; messageId: string }[]> {
+    return this.paginate(
+      (pageToken) =>
+        this.gmail.users.drafts.list({
+          userId: this.userId,
+          maxResults: options.maxResults ?? 100,
+          pageToken,
+          q: options.query,
+        }),
+      (response) =>
+        response.data.drafts?.map((d) => ({
+          id: d.id ?? '',
+          messageId: d.message?.id ?? '',
+        })),
+      options.maxPages ?? 10,
+      'drafts.list',
+    );
   }
 
   /**

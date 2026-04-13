@@ -1,38 +1,31 @@
 /**
  * Gmail Toolkit — History Composed Operation
  *
- * Incremental sync: retrieve only the mailbox changes since a known history ID.
- * Use the historyId from a previous getAccount(), readMessage(), or search() call
- * as the polling watermark and pass it here to get everything that changed since.
+ * Incremental sync: auto-paginate all mailbox changes since a known history ID.
+ * Not exposed as an MCP tool — Layer 2 only for programmatic callers.
  */
 
-import type { GmailClient } from '../client/index.js';
-import type { HistoryResult } from '../types.js';
-import { logger } from '../logger.js';
+import { logger, type GmailContext, type HistoryResult } from './base.js';
 
 const log = logger.child('composed:history');
 
 /**
- * Get mailbox change events since a given history ID (incremental sync).
+ * Get all mailbox change events since a given history ID (auto-paginated).
  *
  * Translates raw Gmail history records into flat `HistoryEvent` objects
  * grouped by type. Use the returned `current_history_id` as the next polling
- * watermark. Typical loop: poll every N minutes, call readMessage() only for
- * `messageAdded` events whose `label_ids` include `INBOX`.
- * @param client - The authenticated Gmail API client
+ * watermark.
+ * @param ctx - The authenticated Gmail context
  * @param sinceHistoryId - The history ID to start from (exclusive). Obtain from
  *   `getAccount().history_id`, `readMessage().history_id`, or a previous call.
- * @param maxResults - Maximum number of history records per page (default 100)
- * @param pageToken - Pagination token from a previous getHistory() call
- * @returns Change events with the new history ID watermark for the next poll
+ * @returns All change events since the watermark, with the new watermark
  */
 export async function getHistory(
-  client: GmailClient,
+  ctx: GmailContext,
   sinceHistoryId: string,
-  maxResults = 100,
-  pageToken?: string,
 ): Promise<HistoryResult> {
-  const raw = await client.history.list({ startHistoryId: sinceHistoryId, maxResults, pageToken });
+  const { client } = ctx;
+  const raw = await client.history.listAll({ startHistoryId: sinceHistoryId });
 
   const events: HistoryResult['events'] = [];
 
@@ -80,7 +73,6 @@ export async function getHistory(
 
   return {
     current_history_id: raw.historyId,
-    next_page_token: raw.nextPageToken,
     events,
   };
 }
