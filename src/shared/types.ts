@@ -74,9 +74,7 @@ export const MessageSummarySchema = z.object({
   // history_id is a sync primitive — available on FullMessage for incremental sync use cases.
 });
 /**
- * Lightweight message representation included in search results.
- * Contains headers, labels, and optional processed body text but omits raw MIME parts.
- * Sparse optional fields (cc, reply_to, body_text) are absent rather than null when empty.
+ *
  */
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
 
@@ -90,21 +88,23 @@ export const MatchedMessageSummarySchema = MessageSummarySchema.omit({
   thread_id: true,
 });
 /**
- * Slim message representation used inside {@link ThreadMatch}.
- * Omits `subject` and `thread_id` — both are available on the parent thread object.
+ *
  */
 export type MatchedMessageSummary = z.infer<typeof MatchedMessageSummarySchema>;
 
 /** Zod schema for aggregate analytics derived from a search result set. */
 export const SearchSummarySchema = z.object({
   unread_count: z.number(),
-  senders: z.record(z.string(), z.number()),
+  senders: z.array(z.object({ name: z.string().nullable(), email: z.string(), count: z.number() })),
   labels: z.record(z.string(), z.number()),
-  thread_message_counts: z.record(z.string(), z.number()),
+  thread_depth: z.object({
+    single_message: z.number(),
+    multi_message: z.number(),
+    deepest: z.object({ thread_id: z.string(), count: z.number() }).optional(),
+  }),
 });
 /**
- * Aggregate analytics computed from a set of search results:
- * unread count, sender frequency map, and label frequency map.
+ *
  */
 export type SearchSummary = z.infer<typeof SearchSummarySchema>;
 
@@ -130,8 +130,10 @@ export const FullMessageSchema = z.object({
   thread_id: z.string(),
   from: ContactSchema,
   to: z.array(ContactSchema),
-  cc: z.array(ContactSchema),
-  bcc: z.array(ContactSchema),
+  /** Absent when the message has no CC recipients. */
+  cc: z.array(ContactSchema).optional(),
+  /** Absent when the message has no BCC recipients. */
+  bcc: z.array(ContactSchema).optional(),
   reply_to: ContactSchema.nullable(),
   subject: z.string(),
   date: z.string(), // ISO 8601 — derived from internalDate (Gmail receipt time, not sender Date header)
@@ -141,14 +143,15 @@ export const FullMessageSchema = z.object({
   is_mailing_list: z.boolean(),
   body_text: z.string(),
   body_html: z.string().nullable(),
-  attachments: z.array(AttachmentInfoSchema),
+  /** Absent when the message has no attachments. */
+  attachments: z.array(AttachmentInfoSchema).optional(),
   size_bytes: z.number(),
-  history_id: z.string(),
+  /** History ID for incremental sync. Absent when unavailable. */
+  history_id: z.string().optional(),
   web_url: z.string(),
 });
 /**
- * Complete message with all headers, processed plain-text and HTML body,
- * attachment metadata, and resolved label names.
+ *
  */
 export type FullMessage = z.infer<typeof FullMessageSchema>;
 
@@ -176,8 +179,7 @@ export const FullThreadSchema = z.object({
   date_range: DateRangeSchema,
 });
 /**
- * Full email thread with all messages in chronological order, resolved label names,
- * participant list, and optional per-label message counts.
+ *
  */
 export type FullThread = z.infer<typeof FullThreadSchema>;
 
@@ -218,8 +220,7 @@ export const LabelOverviewSchema = z.object({
   }),
 });
 /**
- * Full label listing grouped into system labels, user labels, and categories,
- * with a summary of usage statistics.
+ *
  */
 export type LabelOverview = z.infer<typeof LabelOverviewSchema>;
 
@@ -295,8 +296,8 @@ export type FilterCriteriaInput = z.infer<typeof FilterCriteriaInputSchema>;
 export const SearchCriteriaInputSchema = FilterCriteriaInputSchema.extend({
   after: z.string().optional(),
   before: z.string().optional(),
-  label: z.string().optional(),
-  exclude_label: z.string().optional(),
+  labels: z.array(z.string()).optional(),
+  exclude_labels: z.array(z.string()).optional(),
   is: z.enum(['unread', 'read', 'starred', 'important', 'snoozed']).optional(),
   filter_id: z.string().optional(),
 });
@@ -356,12 +357,7 @@ export const AccountOverviewSchema = z.object({
     email: z.string().nullable(),
     disposition: z.string().nullable(),
   }),
-  forwarding_addresses: z.array(
-    z.object({
-      email: z.string(),
-      verified: z.boolean(),
-    }),
-  ),
+  forwarding_addresses: z.array(z.object({ email: z.string(), verified: z.boolean() })),
   send_as_aliases: z.array(
     z.object({
       email: z.string(),
@@ -373,12 +369,7 @@ export const AccountOverviewSchema = z.object({
       signature_text: z.string().nullable(),
     }),
   ),
-  delegates: z.array(
-    z.object({
-      email: z.string(),
-      status: z.string(),
-    }),
-  ),
+  delegates: z.array(z.object({ email: z.string(), status: z.string() })),
   imap: z.object({
     enabled: z.boolean(),
     auto_expunge: z.boolean(),
@@ -451,8 +442,7 @@ export const DeleteFilterResultSchema = z.object({
   message: z.string(),
 });
 /**
- * Result of deleting a Gmail filter: confirmation flag, filter ID, and a
- * human-readable summary of the criteria that were removed.
+ *
  */
 export type DeleteFilterResult = z.infer<typeof DeleteFilterResultSchema>;
 
@@ -463,8 +453,7 @@ export const SendResultSchema = z.object({
   message: z.string(),
 });
 /**
- * Result of sending a message or draft: assigned message ID, thread ID, and a
- * human-readable confirmation.
+ *
  */
 export type SendResult = z.infer<typeof SendResultSchema>;
 
@@ -472,56 +461,44 @@ export type SendResult = z.infer<typeof SendResultSchema>;
 // Compose Mode (discriminated union for unified compose operations)
 // ---------------------------------------------------------------------------
 
-/** Zod schema for creating a new draft. */
+const ComposeCommonFields = {
+  cc: z.string().optional(),
+  bcc: z.string().optional(),
+  content_type: z.enum(['text/plain', 'text/html']).optional(),
+  thread_id: z.string().optional(),
+};
+
 const ComposeDraftSchema = z.object({
   mode: z.literal('draft'),
   body: z.string(),
   to: z.string().optional(),
   subject: z.string().optional(),
-  cc: z.string().optional(),
-  bcc: z.string().optional(),
-  content_type: z.enum(['text/plain', 'text/html']).optional(),
-  thread_id: z.string().optional(),
+  ...ComposeCommonFields,
 });
 
-/** Zod schema for updating an existing draft. */
 const ComposeUpdateDraftSchema = z.object({
   mode: z.literal('update_draft'),
   draft_id: z.string(),
   body: z.string(),
   to: z.string().optional(),
   subject: z.string().optional(),
-  cc: z.string().optional(),
-  bcc: z.string().optional(),
-  content_type: z.enum(['text/plain', 'text/html']).optional(),
-  thread_id: z.string().optional(),
+  ...ComposeCommonFields,
 });
 
-/** Zod schema for sending a new message directly. */
 const ComposeSendSchema = z.object({
   mode: z.literal('send'),
   to: z.string(),
   subject: z.string(),
   body: z.string(),
-  cc: z.string().optional(),
-  bcc: z.string().optional(),
-  content_type: z.enum(['text/plain', 'text/html']).optional(),
-  thread_id: z.string().optional(),
+  ...ComposeCommonFields,
 });
 
-/** Zod schema for sending an existing draft. */
 const ComposeSendDraftSchema = z.object({
   mode: z.literal('send_draft'),
   draft_id: z.string(),
 });
 
-/**
- * Discriminated union for all compose operations.
- * - `draft`: Create a new draft
- * - `update_draft`: Update an existing draft
- * - `send`: Compose and send a new message directly
- * - `send_draft`: Send an existing draft
- */
+/** Discriminated union for all compose operations: draft, update_draft, send, send_draft. */
 export const ComposeModeSchema = z.discriminatedUnion('mode', [
   ComposeDraftSchema,
   ComposeUpdateDraftSchema,
@@ -639,21 +616,25 @@ export type MessageWithContext = z.infer<typeof MessageWithContextSchema>;
 // Error (MCP response DTO)
 // ---------------------------------------------------------------------------
 
-/**
- * Zod schema for the serialised error DTO returned by MCP tool handlers.
- * Tool handlers catch `GmailApiError` / `GmailValidationError` from Layers 1–2
- * and populate this schema before returning `{ content, isError: true }`.
- * Not thrown directly — see `src/errors.ts` for the thrown error classes.
- */
+/** Zod schema for the serialised error DTO returned by MCP tool handlers. */
 export const GmailToolkitErrorSchema = z.object({
   code: z.number(),
   message: z.string(),
   operation: z.string(),
   retryable: z.boolean(),
   field: z.string().optional(),
+  recovery: z
+    .object({
+      strategy: z.string(),
+      suggestion: z.string(),
+      retry_after_seconds: z.number().optional(),
+    })
+    .optional(),
 });
 /**
  * Serialised error DTO returned inside MCP tool results when an operation fails.
  * Carries HTTP status code, message, operation label, retryability flag, and optional field name.
  */
 export type GmailToolkitError = z.infer<typeof GmailToolkitErrorSchema>;
+/** Recovery advice extracted from a GmailToolkitError. */
+export type Recovery = NonNullable<GmailToolkitError['recovery']>;

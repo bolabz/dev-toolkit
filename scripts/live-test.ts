@@ -182,7 +182,7 @@ async function main() {
       const m = r[0];
       ok(
         `read(1, includeHtml=true)`,
-        `from=${m.message.from.email}, attach=${m.message.attachments.length}, html=${m.message.body_html != null ? 'yes' : 'no'}, pos=${m.thread.position}/${m.thread.message_count}`,
+        `from=${m.message.from.email}, attach=${(m.message.attachments ?? []).length}, html=${m.message.body_html != null ? 'yes' : 'no'}, pos=${m.thread.position}/${m.thread.message_count}`,
       );
     } catch (err) {
       fail('read(single)', err);
@@ -243,7 +243,7 @@ async function main() {
       const r = await gmail.read(batchIds, { includeHtml: true });
       for (const m of r) validate(MessageWithContextSchema, m, `ctx[${m.message.id}]`);
       const uniqueThreads = new Set(r.map((m) => m.thread.id)).size;
-      const withAttach = r.filter((m) => m.message.attachments.length > 0).length;
+      const withAttach = r.filter((m) => (m.message.attachments ?? []).length > 0).length;
       const withHtml = r.filter((m) => m.message.body_html != null).length;
       const positions = r.map((m) => `${m.thread.position}/${m.thread.message_count}`);
       ok(

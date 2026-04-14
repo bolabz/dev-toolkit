@@ -78,8 +78,11 @@ export function registerReadTools(
             .string()
             .optional()
             .describe('Messages before this date (YYYY-MM-DD or ISO 8601)'),
-          label: z.string().optional().describe('Include messages with this label'),
-          exclude_label: z.string().optional().describe('Exclude messages with this label'),
+          labels: z.array(z.string()).optional().describe('Include messages with these labels'),
+          exclude_labels: z
+            .array(z.string())
+            .optional()
+            .describe('Exclude messages with these labels'),
           is: z
             .enum(['unread', 'read', 'starred', 'important', 'snoozed'])
             .optional()
@@ -109,8 +112,8 @@ export function registerReadTools(
             ...(params.size_comparison != null && { size_comparison: params.size_comparison }),
             ...(params.after != null && { after: params.after }),
             ...(params.before != null && { before: params.before }),
-            ...(params.label != null && { label: params.label }),
-            ...(params.exclude_label != null && { exclude_label: params.exclude_label }),
+            ...(params.labels != null && { labels: params.labels }),
+            ...(params.exclude_labels != null && { exclude_labels: params.exclude_labels }),
             ...(params.is != null && { is: params.is }),
           };
           const criteriaQuery = filterCriteriaToQuery(criteria);

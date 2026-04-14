@@ -7,36 +7,27 @@
 import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase, type MessageFormat } from './base.js';
 
-/** Query options for listing Gmail threads. */
+/** Options for listing Gmail threads (single page or auto-paginated). */
 export interface ListThreadsOptions {
   query?: string;
   maxResults?: number;
   pageToken?: string;
   labelIds?: string[];
   includeSpamTrash?: boolean;
-}
-
-/** Options for auto-paginated thread listing (pageToken handled internally). */
-export interface ListAllThreadsOptions {
-  query?: string;
-  maxResults?: number;
-  labelIds?: string[];
-  includeSpamTrash?: boolean;
+  /** Auto-paginate through all result pages. When true, pageToken is ignored. */
+  allPages?: boolean;
+  /** Maximum pages to fetch when allPages is true (default 50). */
   maxPages?: number;
 }
 
 /** Public contract for Gmail thread operations. */
 export interface IThreadsClient {
-  /** List thread summaries matching a query with pagination. */
+  /** List thread summaries matching a query. Pass allPages to auto-paginate. */
   list: (options?: ListThreadsOptions) => Promise<{
     threads: { id: string; snippet: string; historyId: string }[];
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }>;
-  /** List all thread summaries matching a query, auto-paginating through all pages. */
-  listAll: (
-    options?: ListAllThreadsOptions,
-  ) => Promise<{ id: string; snippet: string; historyId: string }[]>;
   /** Get a full thread by ID with all messages. */
   get: (
     id: string,
@@ -67,6 +58,7 @@ export interface IThreadsClient {
 export class ThreadsClient extends GmailClientBase implements IThreadsClient {
   /**
    * List thread summaries matching a query.
+   * Pass `allPages: true` to auto-paginate through all result pages.
    * @param options - Query, pagination, and filter options
    * @returns Matching thread summaries with pagination metadata
    */
@@ -75,57 +67,42 @@ export class ThreadsClient extends GmailClientBase implements IThreadsClient {
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }> {
-    const response = await this.execute(
-      () =>
-        this.gmail.users.threads.list({
-          userId: this.userId,
-          q: options.query,
-          maxResults: options.maxResults ?? 20,
-          pageToken: options.pageToken,
-          labelIds: options.labelIds,
-          includeSpamTrash: options.includeSpamTrash ?? false,
-        }),
-      'threads.list',
-    );
+    const maxResults = options.maxResults ?? 500;
+    let resultSizeEstimate = 0;
 
-    return {
-      threads: (response.data.threads ?? []).map((t) => ({
-        id: t.id ?? '',
-        snippet: t.snippet ?? '',
-        historyId: t.historyId ?? '',
-      })),
-      nextPageToken: response.data.nextPageToken ?? null,
-      resultSizeEstimate: response.data.resultSizeEstimate ?? 0,
-    };
-  }
-
-  /**
-   * List all thread summaries matching a query, auto-paginating through all pages.
-   * @param options - Query, filter, and pagination options
-   * @returns All matching thread summaries
-   */
-  async listAll(
-    options: ListAllThreadsOptions = {},
-  ): Promise<{ id: string; snippet: string; historyId: string }[]> {
-    return this.paginate(
-      (pageToken) =>
-        this.gmail.users.threads.list({
-          userId: this.userId,
-          q: options.query,
-          maxResults: options.maxResults ?? 500,
-          pageToken,
-          labelIds: options.labelIds,
-          includeSpamTrash: options.includeSpamTrash ?? false,
-        }),
-      (response) =>
-        response.data.threads?.map((t) => ({
+    const fetchPage = async (pageToken?: string) => {
+      const response = await this.execute(
+        () =>
+          this.gmail.users.threads.list({
+            userId: this.userId,
+            q: options.query,
+            maxResults,
+            pageToken,
+            labelIds: options.labelIds,
+            includeSpamTrash: options.includeSpamTrash ?? false,
+          }),
+        'threads.list',
+      );
+      if (resultSizeEstimate === 0) {
+        resultSizeEstimate = response.data.resultSizeEstimate ?? 0;
+      }
+      return {
+        items: (response.data.threads ?? []).map((t) => ({
           id: t.id ?? '',
           snippet: t.snippet ?? '',
           historyId: t.historyId ?? '',
         })),
-      options.maxPages ?? 50,
-      'threads.listAll',
-    );
+        nextPageToken: response.data.nextPageToken ?? null,
+      };
+    };
+
+    if (options.allPages === true) {
+      const threads = await this.paginate(fetchPage, options.maxPages ?? 50);
+      return { threads, nextPageToken: null, resultSizeEstimate };
+    }
+
+    const page = await fetchPage(options.pageToken);
+    return { threads: page.items, nextPageToken: page.nextPageToken, resultSizeEstimate };
   }
 
   /**

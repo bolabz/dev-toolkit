@@ -29,6 +29,7 @@ import {
   type FilterCriteriaInput,
   type SearchCriteriaInput,
   type GmailToolkitError,
+  type Recovery,
 } from '../shared/index.js';
 import { toMcpResult, type McpToolResult } from './utils.js';
 import { resolveToolRegistry, type ToolName, type ToolConfig } from './tool-registry.js';
@@ -64,8 +65,69 @@ export type { McpToolResult };
 export { toMcpResult };
 
 /**
+ * Derive a contextual recovery strategy from an error.
+ * @param err - The caught error to analyze for recovery advice
+ * @returns A recovery strategy or undefined when no advice applies
+ */
+function getRecovery(err: unknown): Recovery | undefined {
+  if (err instanceof GmailApiError) {
+    switch (err.code) {
+      case 429:
+        return {
+          strategy: 'retry_after',
+          suggestion: 'Gmail API rate limit exceeded. Wait before retrying.',
+          retry_after_seconds: 30,
+        };
+      case 403:
+        return {
+          strategy: 'check_permissions',
+          suggestion:
+            'Insufficient Gmail API permissions. Verify OAuth scopes include the required access.',
+        };
+      case 404:
+        return {
+          strategy: 'verify_input',
+          suggestion: `The referenced ${err.operation.split('.')[0]} was not found. Verify the ID is correct.`,
+        };
+      case 500:
+      case 502:
+      case 503:
+        return {
+          strategy: 'retry_after',
+          suggestion: 'Gmail service temporarily unavailable.',
+          retry_after_seconds: 5,
+        };
+    }
+    // Network errors
+    if (err.retryable && err.code === 0) {
+      return {
+        strategy: 'retry_after',
+        suggestion: 'Network error. Check connectivity and retry.',
+        retry_after_seconds: 3,
+      };
+    }
+  }
+  if (err instanceof GmailValidationError) {
+    if (err.field === 'labelName' || err.message.includes('label')) {
+      return {
+        strategy: 'verify_input',
+        suggestion: 'Label not found. Use gmail_account to list all available labels.',
+      };
+    }
+    if (err.field === 'filterId' || err.message.includes('filter')) {
+      return {
+        strategy: 'verify_input',
+        suggestion: 'Filter not found. Use gmail_account to list all filter IDs.',
+      };
+    }
+  }
+  return undefined;
+}
+
+/**
  * Convert any caught error into an MCP tool result with `isError: true`.
  * Populates the `GmailToolkitError` DTO shape so callers get structured info.
+ * Includes actionable recovery advice when applicable.
  * Logs the error via the shared MCP logger before returning.
  * @param err - The caught error (any type — will be narrowed internally)
  * @param toolName - The MCP tool name used as fallback operation label
@@ -96,6 +158,12 @@ export function toMcpError(err: unknown, toolName: string): McpToolResult & { is
       retryable: false,
     };
   }
+
+  const recovery = getRecovery(err);
+  if (recovery != null) {
+    errorDto.recovery = recovery;
+  }
+
   log.error(`Tool error [${toolName}]: ${errorDto.message}`);
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(errorDto, null, 2) }],

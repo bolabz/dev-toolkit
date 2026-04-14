@@ -7,34 +7,27 @@
 import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase, type MessageFormat } from './base.js';
 
-/** Query options for listing Gmail messages. */
+/** Options for listing Gmail messages (single page or auto-paginated). */
 export interface ListMessagesOptions {
   query?: string;
   maxResults?: number;
   pageToken?: string;
   labelIds?: string[];
   includeSpamTrash?: boolean;
-}
-
-/** Options for auto-paginated message listing (pageToken handled internally). */
-export interface ListAllMessagesOptions {
-  query?: string;
-  maxResults?: number;
-  labelIds?: string[];
-  includeSpamTrash?: boolean;
+  /** Auto-paginate through all result pages. When true, pageToken is ignored. */
+  allPages?: boolean;
+  /** Maximum pages to fetch when allPages is true (default 50). */
   maxPages?: number;
 }
 
 /** Public contract for Gmail message operations. */
 export interface IMessagesClient {
-  /** List message IDs matching a query with pagination. */
+  /** List message IDs matching a query. Pass allPages to auto-paginate. */
   list: (options?: ListMessagesOptions) => Promise<{
     messages: { id: string; threadId: string }[];
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }>;
-  /** List all message IDs matching a query, auto-paginating through all pages. */
-  listAll: (options?: ListAllMessagesOptions) => Promise<{ id: string; threadId: string }[]>;
   /** Get a single message by ID. */
   get: (
     id: string,
@@ -75,6 +68,7 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
   /**
    * List message IDs matching a query.
    * Returns IDs only — use get() or batchGet() for full data.
+   * Pass `allPages: true` to auto-paginate through all result pages.
    * @param options - Query, pagination, and filter options
    * @returns Matching message IDs with pagination metadata
    */
@@ -83,53 +77,41 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
     nextPageToken: string | null;
     resultSizeEstimate: number;
   }> {
-    const response = await this.execute(
-      () =>
-        this.gmail.users.messages.list({
-          userId: this.userId,
-          q: options.query,
-          maxResults: options.maxResults ?? 20,
-          pageToken: options.pageToken,
-          labelIds: options.labelIds,
-          includeSpamTrash: options.includeSpamTrash ?? false,
-        }),
-      'messages.list',
-    );
+    const maxResults = options.maxResults ?? 500;
+    let resultSizeEstimate = 0;
 
-    return {
-      messages: (response.data.messages ?? []).map((m) => ({
-        id: m.id ?? '',
-        threadId: m.threadId ?? '',
-      })),
-      nextPageToken: response.data.nextPageToken ?? null,
-      resultSizeEstimate: response.data.resultSizeEstimate ?? 0,
-    };
-  }
-
-  /**
-   * List all message IDs matching a query, auto-paginating through all pages.
-   * @param options - Query, filter, and pagination options
-   * @returns All matching message ID/threadId pairs
-   */
-  async listAll(options: ListAllMessagesOptions = {}): Promise<{ id: string; threadId: string }[]> {
-    return this.paginate(
-      (pageToken) =>
-        this.gmail.users.messages.list({
-          userId: this.userId,
-          q: options.query,
-          maxResults: options.maxResults ?? 500,
-          pageToken,
-          labelIds: options.labelIds,
-          includeSpamTrash: options.includeSpamTrash ?? false,
-        }),
-      (response) =>
-        response.data.messages?.map((m) => ({
+    const fetchPage = async (pageToken?: string) => {
+      const response = await this.execute(
+        () =>
+          this.gmail.users.messages.list({
+            userId: this.userId,
+            q: options.query,
+            maxResults,
+            pageToken,
+            labelIds: options.labelIds,
+            includeSpamTrash: options.includeSpamTrash ?? false,
+          }),
+        'messages.list',
+      );
+      if (resultSizeEstimate === 0) {
+        resultSizeEstimate = response.data.resultSizeEstimate ?? 0;
+      }
+      return {
+        items: (response.data.messages ?? []).map((m) => ({
           id: m.id ?? '',
           threadId: m.threadId ?? '',
         })),
-      options.maxPages ?? 50,
-      'messages.listAll',
-    );
+        nextPageToken: response.data.nextPageToken ?? null,
+      };
+    };
+
+    if (options.allPages === true) {
+      const messages = await this.paginate(fetchPage, options.maxPages ?? 50);
+      return { messages, nextPageToken: null, resultSizeEstimate };
+    }
+
+    const page = await fetchPage(options.pageToken);
+    return { messages: page.items, nextPageToken: page.nextPageToken, resultSizeEstimate };
   }
 
   /**

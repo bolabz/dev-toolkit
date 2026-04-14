@@ -439,18 +439,20 @@ export async function transformMessage(
   );
   const headers = headerMap(raw.payload?.headers ?? []);
 
+  const bccList = parseContactList(headers.get('Bcc') ?? '');
+  const attachmentList = extractAttachments(raw.payload);
+
   return {
     ...fields,
-    // Coerce optional NormalizedMessageFields back to required FullMessage shapes
-    cc: fields.cc ?? [],
+    // cc already optional from normalizeMessageFields — pass through as-is
     reply_to: fields.reply_to ?? null,
-    // FullMessage-only: history_id for incremental sync; web_url for direct linking
-    history_id: raw.historyId ?? '',
+    // Omit empty arrays and absent history_id to reduce response noise
+    ...(bccList.length > 0 ? { bcc: bccList } : {}),
+    ...(raw.historyId != null && raw.historyId !== '' ? { history_id: raw.historyId } : {}),
     web_url: gmailWebUrl(raw.id ?? ''),
-    bcc: parseContactList(headers.get('Bcc') ?? ''),
     body_text: text,
     body_html: html,
-    attachments: extractAttachments(raw.payload),
+    ...(attachmentList.length > 0 ? { attachments: attachmentList } : {}),
   };
 }
 

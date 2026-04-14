@@ -8,6 +8,7 @@
  *   trash: unified trash (message IDs or thread IDs)
  */
 
+import type { gmail_v1 } from 'googleapis';
 import {
   transformMessage,
   logger,
@@ -39,10 +40,13 @@ const METADATA_HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date', 'Reply-To', 'Li
 // ---------------------------------------------------------------------------
 
 /**
- * Search Gmail and collect ALL matching messages across all pages, grouped by thread.
+ * Search Gmail with pipelined pagination: interleaves message listing with
+ * thread metadata fetching to spread quota consumption evenly.
  *
- * Uses auto-paginated listAll() to collect message IDs, then fetches thread
- * metadata to build thread-grouped results with analytics.
+ * Instead of collecting ALL message IDs first then batch-fetching ALL threads
+ * (which spikes quota for large result sets), this pipeline processes one page
+ * at a time: list a page of message IDs, immediately batchGet any NEW threads
+ * from that page, then continue to the next page.
  * @param ctx - The authenticated Gmail context
  * @param query - Gmail search query string
  * @param options - Optional configuration for filtering search results
@@ -56,49 +60,79 @@ export async function search(
 ): Promise<SearchAllResult> {
   const { client, labelCache } = ctx;
 
-  // 1. Collect all matching message IDs + threadIds
-  const allMessages = await client.messages.listAll({
-    query,
-    labelIds: options?.labelIds,
-  });
+  // --- Phase 1: Pipelined fetch — list pages interleaved with thread batchGet ---
+  const matchedByThread = new Map<string, Set<string>>();
+  const fetchedThreads = new Map<string, gmail_v1.Schema$Thread>();
+  let totalMessages = 0;
+  let pageToken: string | null = null;
 
-  if (allMessages.length === 0) {
+  do {
+    const page = await client.messages.list({
+      query,
+      labelIds: options?.labelIds,
+      ...(pageToken != null ? { pageToken } : {}),
+    });
+
+    // Group message IDs by thread, identify threads we haven't fetched yet
+    const newThreadIds: string[] = [];
+    for (const msg of page.messages) {
+      totalMessages++;
+      const set = matchedByThread.get(msg.threadId) ?? new Set<string>();
+      if (set.size === 0 && !fetchedThreads.has(msg.threadId)) {
+        newThreadIds.push(msg.threadId);
+      }
+      set.add(msg.id);
+      matchedByThread.set(msg.threadId, set);
+    }
+
+    // Immediately fetch metadata for new threads from this page
+    if (newThreadIds.length > 0) {
+      const threads = await client.threads.batchGet(newThreadIds, 'metadata', METADATA_HEADERS);
+      for (const t of threads) {
+        if (t.id != null) fetchedThreads.set(t.id, t);
+      }
+    }
+
+    pageToken = page.nextPageToken;
+  } while (pageToken != null);
+
+  // --- Phase 2: Build results from accumulated data ---
+  if (totalMessages === 0) {
     return {
       total_messages: 0,
       total_threads: 0,
       threads: [],
-      summary: { unread_count: 0, senders: {}, labels: {}, thread_message_counts: {} },
+      summary: {
+        unread_count: 0,
+        senders: [],
+        labels: {},
+        thread_depth: { single_message: 0, multi_message: 0 },
+      },
     };
   }
 
-  // 2. Group matched message IDs by thread
-  const matchedByThread = new Map<string, Set<string>>();
-  for (const msg of allMessages) {
-    const set = matchedByThread.get(msg.threadId) ?? new Set<string>();
-    set.add(msg.id);
-    matchedByThread.set(msg.threadId, set);
-  }
-
-  // 3. Fetch thread metadata (includes all messages per thread)
-  const threadIds = [...matchedByThread.keys()];
-  const rawThreads = await client.threads.batchGet(threadIds, 'metadata', METADATA_HEADERS);
-
-  // 4. Build ThreadMatch for each thread
-  const senderCounts: Record<string, number> = {};
+  const senderMap = new Map<string, { name: string | null; email: string; count: number }>();
   const labelCounts: Record<string, number> = {};
-  const threadMessageCounts: Record<string, number> = {};
   let unreadCount = 0;
+  let singleMessage = 0;
+  let multiMessage = 0;
+  let deepestThreadId = '';
+  let deepestCount = 0;
 
   const threads: ThreadMatch[] = [];
-  for (const rawThread of rawThreads) {
-    const threadId = rawThread.id ?? '';
-    const matchedIds = matchedByThread.get(threadId);
-    if (matchedIds == null) continue;
+  for (const [threadId, matchedIds] of matchedByThread) {
+    const rawThread = fetchedThreads.get(threadId);
+    if (rawThread == null) continue;
 
     const allMsgs = rawThread.messages ?? [];
-    threadMessageCounts[threadId] = allMsgs.length;
+    if (allMsgs.length === 1) singleMessage++;
+    else multiMessage++;
+    if (allMsgs.length > deepestCount) {
+      deepestCount = allMsgs.length;
+      deepestThreadId = threadId;
+    }
 
-    // Build MessageSummary for matched messages only
+    // Build MatchedMessageSummary for matched messages only
     const matchedMessages: MatchedMessageSummary[] = [];
     const allParticipants: Contact[] = [];
     let threadHasUnread = false;
@@ -125,8 +159,14 @@ export async function search(
 
       if (fields.is_unread) unreadCount++;
 
-      const senderKey = fields.from.name ?? fields.from.email;
-      senderCounts[senderKey] = (senderCounts[senderKey] ?? 0) + 1;
+      const senderEmail = fields.from.email;
+      const existing = senderMap.get(senderEmail);
+      if (existing != null) {
+        existing.count++;
+        if (existing.name == null && fields.from.name != null) existing.name = fields.from.name;
+      } else {
+        senderMap.set(senderEmail, { name: fields.from.name, email: senderEmail, count: 1 });
+      }
       for (const label of resolvedLabels) {
         labelCounts[label] = (labelCounts[label] ?? 0) + 1;
       }
@@ -170,14 +210,20 @@ export async function search(
   }
 
   return {
-    total_messages: allMessages.length,
+    total_messages: totalMessages,
     total_threads: threads.length,
     threads,
     summary: {
       unread_count: unreadCount,
-      senders: senderCounts,
+      senders: [...senderMap.values()],
       labels: labelCounts,
-      thread_message_counts: threadMessageCounts,
+      thread_depth: {
+        single_message: singleMessage,
+        multi_message: multiMessage,
+        ...(deepestCount > 1
+          ? { deepest: { thread_id: deepestThreadId, count: deepestCount } }
+          : {}),
+      },
     },
   };
 }
@@ -280,7 +326,7 @@ export async function read(
           id: message.thread_id,
           subject: message.subject,
           message_count: 1,
-          participants: [message.from, ...message.to, ...message.cc],
+          participants: [message.from, ...message.to, ...(message.cc ?? [])],
           has_unread: message.is_unread,
           // Single-message thread: last === first, so omit last
           date_range: { first: message.date },
@@ -328,7 +374,10 @@ export async function modify(
 
   if (targets.query != null) {
     // Query-based: auto-paginate to collect all matching message IDs
-    const allMessages = await client.messages.listAll({ query: targets.query });
+    const { messages: allMessages } = await client.messages.list({
+      query: targets.query,
+      allPages: true,
+    });
     messageIds = allMessages.map((m) => m.id);
   } else if (targets.messageIds != null) {
     // Direct message IDs
