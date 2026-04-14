@@ -25,7 +25,7 @@ export async function getHistory(
   sinceHistoryId: string,
 ): Promise<HistoryResult> {
   const { client } = ctx;
-  const raw = await client.history.listAll({ startHistoryId: sinceHistoryId });
+  const raw = await client.history.list({ startHistoryId: sinceHistoryId, allPages: true });
 
   const events: HistoryResult['events'] = [];
 

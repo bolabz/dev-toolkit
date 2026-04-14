@@ -64,6 +64,7 @@ export type {
   HistoryEvent,
   HistoryResult,
   GmailToolkitError,
+  Recovery,
   ThreadMatch,
   SearchAllResult,
   ThreadContext,

@@ -38,7 +38,7 @@ export async function getDrafts(
   includeBody = false,
 ): Promise<DraftSummary> {
   const { client } = ctx;
-  const allDraftIds = await client.drafts.listAll({ query });
+  const { drafts: allDraftIds } = await client.drafts.list({ query, allPages: true });
 
   if (allDraftIds.length === 0) {
     return { total: 0, drafts: [] };

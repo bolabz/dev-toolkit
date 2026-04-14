@@ -36,7 +36,6 @@ export type MessageFormat = 'minimal' | 'metadata' | 'full' | 'raw';
  */
 const QUOTA_COSTS: Record<string, number> = {
   'messages.list': 5,
-  'messages.listAll': 5,
   'messages.get': 5,
   'messages.send': 100,
   'messages.modify': 5,
@@ -46,7 +45,6 @@ const QUOTA_COSTS: Record<string, number> = {
   'messages.delete': 10,
   'messages.getAttachment': 5,
   'threads.list': 10,
-  'threads.listAll': 10,
   'threads.get': 10,
   'threads.modify': 10,
   'threads.trash': 10,
@@ -77,7 +75,6 @@ const QUOTA_COSTS: Record<string, number> = {
   'settings.listDelegates': 1,
   'settings.listForwardingAddresses': 1,
   'history.list': 2,
-  'history.listAll': 2,
 };
 
 // ---------------------------------------------------------------------------
@@ -235,33 +232,28 @@ export abstract class GmailClientBase {
   }
 
   /**
-   * Paginate through a list endpoint, collecting all results.
-   * @param listFn - A function that fetches a page of results given an optional page token
-   * @param extractItems - A function that extracts items from a page response
-   * @param maxPages - The maximum number of pages to fetch before stopping
-   * @param operation - A label used in error messages
+   * Paginate through all pages by calling a fetchPage function repeatedly.
+   *
+   * Each sub-client defines a `fetchPage` closure inside its `list()` method
+   * that handles the API call (via `execute()`) and field extraction.
+   * This helper is just the loop — no rate limiting or API specifics.
+   * @param fetchPage - Fetches one page and returns extracted items + next token
+   * @param maxPages - Maximum pages to fetch before stopping (default 50)
    * @returns All items collected across all pages
    */
-  protected async paginate<TItem, TResponse extends { data: { nextPageToken?: string | null } }>(
-    listFn: (pageToken?: string) => Promise<TResponse>,
-    extractItems: (response: TResponse) => TItem[] | undefined,
+  protected async paginate<T>(
+    fetchPage: (pageToken?: string) => Promise<{ items: T[]; nextPageToken: string | null }>,
     maxPages = 50,
-    operation = 'unknown',
-  ): Promise<TItem[]> {
-    const allItems: TItem[] = [];
+  ): Promise<T[]> {
+    const all: T[] = [];
     let pageToken: string | undefined;
     let pages = 0;
-
     do {
-      const response = await this.execute(() => listFn(pageToken), operation);
-      const items = extractItems(response);
-      if (items !== undefined) {
-        allItems.push(...items);
-      }
-      pageToken = response.data.nextPageToken ?? undefined;
+      const page = await fetchPage(pageToken);
+      all.push(...page.items);
+      pageToken = page.nextPageToken ?? undefined;
       pages++;
-    } while (pageToken !== undefined && pages < maxPages);
-
-    return allItems;
+    } while (pageToken != null && pages < maxPages);
+    return all;
   }
 }

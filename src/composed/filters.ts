@@ -50,6 +50,38 @@ function toFilterDetail(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Gmail Query Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Gmail category label IDs mapped to their search query slugs.
+ * Category tabs use `category:X` in search queries, not `label:CATEGORY_X`.
+ */
+const CATEGORY_LABEL_MAP: Record<string, string> = {
+  CATEGORY_PERSONAL: 'personal',
+  CATEGORY_SOCIAL: 'social',
+  CATEGORY_PROMOTIONS: 'promotions',
+  CATEGORY_UPDATES: 'updates',
+  CATEGORY_FORUMS: 'forums',
+};
+
+/**
+ * Convert a label name to a Gmail search query term, routing category labels
+ * to the `category:` operator and all others to `label:`.
+ * @param labelName - The label name (e.g., "Finance/USAA" or "CATEGORY_UPDATES")
+ * @param negate - Whether to negate the term (prepend `-`)
+ * @returns A Gmail query term (e.g., "label:Finance/USAA" or "-category:updates")
+ */
+export function labelToQueryTerm(labelName: string, negate: boolean): string {
+  const prefix = negate ? '-' : '';
+  const upper = labelName.toUpperCase();
+  if (upper in CATEGORY_LABEL_MAP) {
+    return `${prefix}category:${CATEGORY_LABEL_MAP[upper]}`;
+  }
+  return `${prefix}label:${labelName}`;
+}
+
 /**
  * Normalize an ISO-8601 date string (e.g. `2026-01-15T00:00:00Z`) or a
  * `YYYY-MM-DD` date to Gmail's `YYYY/MM/DD` format.
@@ -91,9 +123,16 @@ export function filterCriteriaToQuery(criteria: SearchCriteriaInput): string {
     parts.push(`after:${formatGmailDate(criteria.after)}`);
   if (criteria.before != null && criteria.before !== '')
     parts.push(`before:${formatGmailDate(criteria.before)}`);
-  if (criteria.label != null && criteria.label !== '') parts.push(`label:${criteria.label}`);
-  if (criteria.exclude_label != null && criteria.exclude_label !== '')
-    parts.push(`-label:${criteria.exclude_label}`);
+  if (criteria.labels != null) {
+    for (const l of criteria.labels) {
+      if (l !== '') parts.push(labelToQueryTerm(l, false));
+    }
+  }
+  if (criteria.exclude_labels != null) {
+    for (const l of criteria.exclude_labels) {
+      if (l !== '') parts.push(labelToQueryTerm(l, true));
+    }
+  }
   if (criteria.is != null) parts.push(`is:${criteria.is}`);
 
   return parts.join(' ');
@@ -320,7 +359,7 @@ export async function updateFilter(
     skip_inbox: boolean;
     mark_read: boolean;
   }>,
-): Promise<FilterDetail & { retroactive: ModifyResult }> {
+): Promise<FilterDetail & { previous_filter_id: string; retroactive: ModifyResult }> {
   const { client, labelCache } = ctx;
 
   // 1. Fetch existing filter from cache
@@ -386,7 +425,7 @@ export async function updateFilter(
     mergedActions.mark_read;
 
   if (query !== '' && hasLabelChanges) {
-    const messages = await client.messages.listAll({ query });
+    const { messages } = await client.messages.list({ query, allPages: true });
 
     if (messages.length > 0) {
       const messageIds = messages.map((m) => m.id);
@@ -419,5 +458,5 @@ export async function updateFilter(
   }
 
   // 7. Return new filter detail + retroactive result
-  return { ...newFilter, retroactive };
+  return { ...newFilter, previous_filter_id: filterId, retroactive };
 }
