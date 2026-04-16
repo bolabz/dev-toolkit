@@ -5,14 +5,14 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ComposedClient } from './base.js';
+import type { GmailToolkit } from './base.js';
 
 /**
  * Register all MCP resources.
  * @param server - The MCP server instance
  * @param composed - The composed Layer 2 client
  */
-export function registerResources(server: McpServer, composed: ComposedClient): void {
+export function registerResources(server: McpServer, composed: GmailToolkit): void {
   server.registerResource(
     'labels',
     'gmail://labels',

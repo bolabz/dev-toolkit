@@ -34,7 +34,7 @@ export interface AuthOptions {
 }
 
 // @public
-export function beginAuthFlow(credentialsPath: string, tokenPath: string): PendingAuth;
+export function beginAuthFlow(credentialsPath?: string, tokenPath?: string): PendingAuth;
 
 // Warning: (ae-forgotten-export) The symbol "ComposeModeSchema" needs to be exported by the entry point index.d.ts
 //
@@ -47,7 +47,7 @@ export type ComposeMode = z.infer<typeof ComposeModeSchema>;
 export type Contact = z.infer<typeof ContactSchema>;
 
 // @public
-export function createGmailContext(credentialsPath: string, tokenPath: string): Promise<GmailContext>;
+export function createGmailToolkit(): Promise<GmailToolkit>;
 
 // Warning: (ae-forgotten-export) The symbol "DateRangeSchema" needs to be exported by the entry point index.d.ts
 //
@@ -80,7 +80,7 @@ export type DraftDetail = z.infer<typeof DraftDetailSchema>;
 export type DraftSummary = z.infer<typeof DraftSummarySchema>;
 
 // @public
-export function ensureAuthenticated(credentialsPath: string, tokenPath: string, options?: AuthOptions): Promise<OAuth2Client>;
+export function ensureAuthenticated(credentialsPath?: string, tokenPath?: string, options?: AuthOptions): Promise<OAuth2Client>;
 
 // Warning: (ae-forgotten-export) The symbol "FilterActionsSchema" needs to be exported by the entry point index.d.ts
 //
@@ -125,38 +125,15 @@ export class GmailApiError extends Error {
     readonly retryable: boolean;
 }
 
-// @public
-export interface GmailContext {
-    // Warning: (ae-forgotten-export) The symbol "IGmailClient" needs to be exported by the entry point index.d.ts
-    readonly client: IGmailClient;
-    // Warning: (ae-forgotten-export) The symbol "IFilterCache" needs to be exported by the entry point index.d.ts
-    readonly filterCache: IFilterCache;
-    // Warning: (ae-forgotten-export) The symbol "ILabelCache" needs to be exported by the entry point index.d.ts
-    readonly labelCache: ILabelCache;
-    // Warning: (ae-forgotten-export) The symbol "IDataCache" needs to be exported by the entry point index.d.ts
-    // Warning: (ae-forgotten-export) The symbol "CachedSettings" needs to be exported by the entry point index.d.ts
-    readonly settingsCache: IDataCache<CachedSettings>;
-}
-
-// Warning: (ae-forgotten-export) The symbol "ComposedClient" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "buildOps" needs to be exported by the entry point index.d.ts
 //
 // @public
-export class GmailToolkit extends ComposedClient {
-    static create(options?: GmailToolkitOptions): Promise<GmailToolkit>;
-}
+export type GmailToolkit = ReturnType<typeof buildOps>;
 
 // Warning: (ae-forgotten-export) The symbol "GmailToolkitErrorSchema" needs to be exported by the entry point index.d.ts
 //
 // @public
 export type GmailToolkitError = z.infer<typeof GmailToolkitErrorSchema>;
-
-// @public
-export interface GmailToolkitOptions {
-    // (undocumented)
-    credentialsPath?: string;
-    // (undocumented)
-    tokenPath?: string;
-}
 
 // @public
 export class GmailValidationError extends Error {

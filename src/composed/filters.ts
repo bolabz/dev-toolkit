@@ -6,14 +6,84 @@ import type { gmail_v1 } from 'googleapis';
 import {
   logger,
   GmailValidationError,
-  type GmailContext,
   type FilterOverview,
   type FilterDetail,
   type DeleteFilterResult,
   type FilterCriteriaInput,
   type SearchCriteriaInput,
   type ModifyResult,
-} from './base.js';
+} from '../shared/index.js';
+import type { GmailContext } from './context.js';
+
+// ---------------------------------------------------------------------------
+// Module Factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Create pre-bound filter operations from an authenticated context.
+ * @param ctx - The authenticated Gmail context
+ * @returns Pre-bound filter operations (getFilters, createFilter, updateFilter, deleteFilter, resolveFilterCriteria)
+ */
+export function createFilterOps(ctx: GmailContext) {
+  return {
+    /**
+     * Retrieve all Gmail filters with resolved label names.
+     * @returns All configured filters with summaries
+     */
+    getFilters: () => getFilters(ctx),
+    /**
+     * Create a new Gmail filter rule (criteria → actions).
+     * @param criteria - Matching criteria for incoming messages
+     * @param actions - Actions to apply when criteria match
+     * @param actions.add_labels - Label names to apply
+     * @param actions.remove_labels - Label names to remove
+     * @param actions.forward_to - Forwarding address
+     * @param actions.skip_inbox - Whether to archive (remove from INBOX)
+     * @param actions.mark_read - Whether to mark as read (remove UNREAD)
+     * @returns The created filter detail
+     */
+    createFilter: (
+      criteria: FilterCriteriaInput,
+      actions: {
+        add_labels?: string[];
+        remove_labels?: string[];
+        forward_to?: string;
+        skip_inbox?: boolean;
+        mark_read?: boolean;
+      },
+    ) => createFilter(ctx, criteria, actions),
+    /**
+     * Update an existing filter via atomic delete+recreate with deep merge + retroactive apply.
+     * @param filterId - Filter ID to update
+     * @param criteriaUpdates - Criteria fields to merge into existing filter
+     * @param actionUpdates - Action fields to merge into existing filter
+     * @returns The new filter detail + retroactive modification result
+     */
+    updateFilter: (
+      filterId: string,
+      criteriaUpdates?: Partial<FilterCriteriaInput>,
+      actionUpdates?: Partial<{
+        add_labels: string[];
+        remove_labels: string[];
+        forward_to: string;
+        skip_inbox: boolean;
+        mark_read: boolean;
+      }>,
+    ) => updateFilter(ctx, filterId, criteriaUpdates, actionUpdates),
+    /**
+     * Permanently delete a Gmail filter rule.
+     * @param filterId - Filter ID to delete
+     * @returns Deletion result with criteria summary
+     */
+    deleteFilter: (filterId: string) => deleteFilter(ctx, filterId),
+    /**
+     * Resolve a filter's criteria to a Gmail search query string.
+     * @param filterId - Filter ID to look up
+     * @returns Gmail query string derived from the filter's criteria
+     */
+    resolveFilterCriteria: (filterId: string) => resolveFilterCriteria(ctx, filterId),
+  };
+}
 
 const log = logger.child('composed:filters');
 

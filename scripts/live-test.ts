@@ -11,7 +11,7 @@
  *        GMAIL_LOG_LEVEL=debug npx tsx scripts/live-test.ts
  */
 
-import { GmailToolkit } from '../src/index.js';
+import { createGmailToolkit, type GmailToolkit } from '../src/index.js';
 import { logger } from '../src/shared/logger.js';
 import {
   AccountContextSchema,
@@ -94,10 +94,10 @@ async function main() {
   section('1. Initialisation');
   let gmail: GmailToolkit;
   try {
-    gmail = await GmailToolkit.create();
-    ok('GmailToolkit.create()');
+    gmail = await createGmailToolkit();
+    ok('createGmailToolkit()');
   } catch (err) {
-    fail('GmailToolkit.create()', err);
+    fail('createGmailToolkit()', err);
     process.exit(1);
   }
 

@@ -15,7 +15,7 @@
  *        GMAIL_LOG_LEVEL=debug npx tsx scripts/debug-layer2.ts
  */
 
-import { GmailToolkit } from '../src/index.js';
+import { createGmailToolkit } from '../src/index.js';
 import { logger } from '../src/shared/logger.js';
 import {
   AccountContextSchema,
@@ -90,7 +90,7 @@ async function capture<T>(
 async function main() {
   log.info('🔍  Gmail Toolkit — Layer 2 Full Stress Test (capture + schema validation)');
 
-  const gmail = await GmailToolkit.create();
+  const gmail = await createGmailToolkit();
   const output: Record<string, unknown> = {};
 
   // ── 1. Account ──────────────────────────────────────────────────────────────

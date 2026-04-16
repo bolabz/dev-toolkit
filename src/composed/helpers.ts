@@ -284,21 +284,6 @@ export function normalizeMessageFields(
 }
 
 // ---------------------------------------------------------------------------
-// Label Classification
-// ---------------------------------------------------------------------------
-
-/**
- * Identify user-created labels by their ID pattern.
- * Gmail user labels always have IDs matching Label_\d+ (e.g., Label_11).
- * System labels have descriptive IDs (INBOX, STARRED, YELLOW_STAR, etc.).
- * @param labelId - The Gmail label ID to classify
- * @returns True if the label is user-created (matches Label_\d+ pattern)
- */
-export function isUserLabel(labelId: string): boolean {
-  return /^Label_\d+$/.test(labelId);
-}
-
-// ---------------------------------------------------------------------------
 // RFC 2822 Message Building
 // ---------------------------------------------------------------------------
 

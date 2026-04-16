@@ -73,9 +73,7 @@ export const MessageSummarySchema = z.object({
   // web_url is derivable: `https://mail.google.com/mail/u/0/#all/${id}`
   // history_id is a sync primitive — available on FullMessage for incremental sync use cases.
 });
-/**
- *
- */
+/** Compact message summary for list/search responses. */
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
 
 /**
@@ -87,9 +85,7 @@ export const MatchedMessageSummarySchema = MessageSummarySchema.omit({
   subject: true,
   thread_id: true,
 });
-/**
- *
- */
+/** Message summary nested within a ThreadMatch — omits subject/thread_id (carried on thread). */
 export type MatchedMessageSummary = z.infer<typeof MatchedMessageSummarySchema>;
 
 /** Zod schema for aggregate analytics derived from a search result set. */
@@ -103,9 +99,7 @@ export const SearchSummarySchema = z.object({
     deepest: z.object({ thread_id: z.string(), count: z.number() }).optional(),
   }),
 });
-/**
- *
- */
+/** Aggregated analytics over a search result (unread counts, senders, labels, thread depth). */
 export type SearchSummary = z.infer<typeof SearchSummarySchema>;
 
 /** Zod schema for a complete paginated message search result. */
@@ -150,9 +144,7 @@ export const FullMessageSchema = z.object({
   history_id: z.string().optional(),
   web_url: z.string(),
 });
-/**
- *
- */
+/** Fully resolved message with parsed contacts, labels, body text, and attachment metadata. */
 export type FullMessage = z.infer<typeof FullMessageSchema>;
 
 // ---------------------------------------------------------------------------
@@ -178,9 +170,7 @@ export const FullThreadSchema = z.object({
   has_unread: z.boolean(),
   date_range: DateRangeSchema,
 });
-/**
- *
- */
+/** Complete thread with all messages, participants, and date range. */
 export type FullThread = z.infer<typeof FullThreadSchema>;
 
 // ---------------------------------------------------------------------------
@@ -219,9 +209,7 @@ export const LabelOverviewSchema = z.object({
     most_active: z.string(),
   }),
 });
-/**
- *
- */
+/** All labels grouped by type (system, user) with counts and summaries. */
 export type LabelOverview = z.infer<typeof LabelOverviewSchema>;
 
 // ---------------------------------------------------------------------------
@@ -441,9 +429,7 @@ export const DeleteFilterResultSchema = z.object({
   criteria_summary: z.string(),
   message: z.string(),
 });
-/**
- *
- */
+/** Result of deleting a filter rule, including the resolved criteria summary. */
 export type DeleteFilterResult = z.infer<typeof DeleteFilterResultSchema>;
 
 /** Zod schema for the result of sending a message or draft. */
@@ -452,9 +438,7 @@ export const SendResultSchema = z.object({
   thread_id: z.string().nullable(),
   message: z.string(),
 });
-/**
- *
- */
+/** Result of sending a message or draft (returns the sent message ID + thread ID). */
 export type SendResult = z.infer<typeof SendResultSchema>;
 
 // ---------------------------------------------------------------------------

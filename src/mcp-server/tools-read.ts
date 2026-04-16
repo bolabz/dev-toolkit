@@ -8,9 +8,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
   filterCriteriaToQuery,
-  toMcpError,
-  toMcpResult,
-  type ComposedClient,
+  withErrorHandling,
+  type GmailToolkit,
   type SearchCriteriaInput,
   type ToolName,
   type ToolConfig,
@@ -20,12 +19,12 @@ import {
  * Register all read-only MCP tools.
  * @param server - The MCP server instance
  * @param toolRegistry - The tool configuration registry
- * @param composed - The composed Layer 2 client
+ * @param toolkit - The Gmail toolkit instance
  */
 export function registerReadTools(
   server: McpServer,
   toolRegistry: Record<ToolName, ToolConfig>,
-  composed: ComposedClient,
+  toolkit: GmailToolkit,
 ): void {
   // ---------------------------------------------------------------------------
   // gmail_account — full account context in one call
@@ -33,16 +32,9 @@ export function registerReadTools(
 
   if (toolRegistry.gmail_account.enabled) {
     server.registerTool(
-      'gmail_account',
+      'Get Account Settings',
       { description: toolRegistry.gmail_account.description },
-      async () => {
-        try {
-          const result = await composed.getAccountContext();
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_account');
-        }
-      },
+      withErrorHandling('gmail_account', () => toolkit.getAccountContext()),
     );
   }
 
@@ -52,7 +44,7 @@ export function registerReadTools(
 
   if (toolRegistry.gmail_search.enabled) {
     server.registerTool(
-      'gmail_search',
+      'Search Mail w/ Parameters',
       {
         description: toolRegistry.gmail_search.description,
         inputSchema: {
@@ -93,41 +85,34 @@ export function registerReadTools(
             .describe('Apply existing filter criteria as search terms'),
         },
       },
-      async (params) => {
-        try {
-          // Resolve filter_id to criteria query if provided
-          let filterQuery = '';
-          if (params.filter_id != null) {
-            filterQuery = await composed.resolveFilterCriteria(params.filter_id);
-          }
-
-          // Build structured criteria query
-          const criteria: SearchCriteriaInput = {
-            ...(params.from != null && { from: params.from }),
-            ...(params.to != null && { to: params.to }),
-            ...(params.subject != null && { subject: params.subject }),
-            ...(params.has_attachment != null && { has_attachment: params.has_attachment }),
-            ...(params.negated_query != null && { negated_query: params.negated_query }),
-            ...(params.size != null && { size: params.size }),
-            ...(params.size_comparison != null && { size_comparison: params.size_comparison }),
-            ...(params.after != null && { after: params.after }),
-            ...(params.before != null && { before: params.before }),
-            ...(params.labels != null && { labels: params.labels }),
-            ...(params.exclude_labels != null && { exclude_labels: params.exclude_labels }),
-            ...(params.is != null && { is: params.is }),
-          };
-          const criteriaQuery = filterCriteriaToQuery(criteria);
-
-          const combinedQuery = [filterQuery, params.query, criteriaQuery]
-            .filter(Boolean)
-            .join(' ');
-
-          const result = await composed.search(combinedQuery);
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_search');
+      withErrorHandling('gmail_search', async (params) => {
+        // Resolve filter_id to criteria query if provided
+        let filterQuery = '';
+        if (params.filter_id != null) {
+          filterQuery = await toolkit.resolveFilterCriteria(params.filter_id);
         }
-      },
+
+        // Build structured criteria query
+        const criteria: SearchCriteriaInput = {
+          ...(params.from != null && { from: params.from }),
+          ...(params.to != null && { to: params.to }),
+          ...(params.subject != null && { subject: params.subject }),
+          ...(params.has_attachment != null && { has_attachment: params.has_attachment }),
+          ...(params.negated_query != null && { negated_query: params.negated_query }),
+          ...(params.size != null && { size: params.size }),
+          ...(params.size_comparison != null && { size_comparison: params.size_comparison }),
+          ...(params.after != null && { after: params.after }),
+          ...(params.before != null && { before: params.before }),
+          ...(params.labels != null && { labels: params.labels }),
+          ...(params.exclude_labels != null && { exclude_labels: params.exclude_labels }),
+          ...(params.is != null && { is: params.is }),
+        };
+        const criteriaQuery = filterCriteriaToQuery(criteria);
+
+        const combinedQuery = [filterQuery, params.query, criteriaQuery].filter(Boolean).join(' ');
+
+        return toolkit.search(combinedQuery);
+      }),
     );
   }
 
@@ -137,7 +122,7 @@ export function registerReadTools(
 
   if (toolRegistry.gmail_read.enabled) {
     server.registerTool(
-      'gmail_read',
+      'Read Email by Message IDs',
       {
         description: toolRegistry.gmail_read.description,
         inputSchema: {
@@ -150,14 +135,9 @@ export function registerReadTools(
             .describe('Include raw HTML body alongside plain text (default false)'),
         },
       },
-      async ({ message_ids, include_html }) => {
-        try {
-          const result = await composed.read(message_ids, { includeHtml: include_html });
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_read');
-        }
-      },
+      withErrorHandling('gmail_read', async ({ message_ids, include_html }) =>
+        toolkit.read(message_ids, { includeHtml: include_html }),
+      ),
     );
   }
 
@@ -167,7 +147,7 @@ export function registerReadTools(
 
   if (toolRegistry.gmail_get_drafts.enabled) {
     server.registerTool(
-      'gmail_get_drafts',
+      'Get Drafts',
       {
         description: toolRegistry.gmail_get_drafts.description,
         inputSchema: {
@@ -175,14 +155,9 @@ export function registerReadTools(
           include_body: z.boolean().optional().describe('Include draft body text (default false)'),
         },
       },
-      async ({ query, include_body }) => {
-        try {
-          const result = await composed.getDrafts(query, include_body);
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_get_drafts');
-        }
-      },
+      withErrorHandling('gmail_get_drafts', async ({ query, include_body }) =>
+        toolkit.getDrafts(query, include_body),
+      ),
     );
   }
 }

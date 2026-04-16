@@ -26,7 +26,7 @@ try {
   await ensureAuthenticated(credentialsPath, tokenPath, { interactive: true });
   log.info('Setup complete! Gmail Toolkit is ready to use.');
   log.info('Next steps:');
-  log.info('  Library:  import { GmailToolkit } from "gmail-toolkit"');
+  log.info('  Library:  import { createGmailToolkit } from "gmail-toolkit"');
   log.info('  MCP:      Add to claude_desktop_config.json (see README)');
 } catch (err) {
   if (err instanceof Error) {
