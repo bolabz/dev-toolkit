@@ -40,7 +40,7 @@ pre-push:
     ci:
       priority: 1
       run: npm run ci
-      timeout: "60s"
+      timeout: "180s"
       fail_text: "Quality checks failed. Run `npm run ci` to see errors."
 
 # ── Commit-msg ────────────────────────────────────────────────────────
