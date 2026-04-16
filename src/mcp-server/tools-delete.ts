@@ -6,24 +6,18 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import {
-  toMcpError,
-  toMcpResult,
-  type ComposedClient,
-  type ToolName,
-  type ToolConfig,
-} from './base.js';
+import { withErrorHandling, type GmailToolkit, type ToolName, type ToolConfig } from './base.js';
 
 /**
  * Register all delete MCP tools.
  * @param server - The MCP server instance
  * @param toolRegistry - The tool configuration registry
- * @param composed - The composed Layer 2 client
+ * @param toolkit - The Gmail toolkit instance
  */
 export function registerDeleteTools(
   server: McpServer,
   toolRegistry: Record<ToolName, ToolConfig>,
-  composed: ComposedClient,
+  toolkit: GmailToolkit,
 ): void {
   // ---------------------------------------------------------------------------
   // gmail_trash — move messages/threads to Trash
@@ -39,17 +33,9 @@ export function registerDeleteTools(
           thread_ids: z.array(z.string()).optional().describe('Thread IDs to trash'),
         },
       },
-      async ({ message_ids, thread_ids }) => {
-        try {
-          const result = await composed.trash({
-            messageIds: message_ids,
-            threadIds: thread_ids,
-          });
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_trash');
-        }
-      },
+      withErrorHandling('gmail_trash', async ({ message_ids, thread_ids }) =>
+        toolkit.trash({ messageIds: message_ids, threadIds: thread_ids }),
+      ),
     );
   }
 
@@ -66,14 +52,7 @@ export function registerDeleteTools(
           label: z.string().describe('Label name or ID to delete'),
         },
       },
-      async ({ label }) => {
-        try {
-          const result = await composed.deleteLabel(label);
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_delete_label');
-        }
-      },
+      withErrorHandling('gmail_delete_label', async ({ label }) => toolkit.deleteLabel(label)),
     );
   }
 
@@ -90,14 +69,9 @@ export function registerDeleteTools(
           filter_id: z.string().describe('Filter ID to delete'),
         },
       },
-      async ({ filter_id }) => {
-        try {
-          const result = await composed.deleteFilter(filter_id);
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_delete_filter');
-        }
-      },
+      withErrorHandling('gmail_delete_filter', async ({ filter_id }) =>
+        toolkit.deleteFilter(filter_id),
+      ),
     );
   }
 
@@ -114,14 +88,9 @@ export function registerDeleteTools(
           draft_id: z.string().describe('Draft ID to delete'),
         },
       },
-      async ({ draft_id }) => {
-        try {
-          const result = await composed.deleteDraft(draft_id);
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_delete_draft');
-        }
-      },
+      withErrorHandling('gmail_delete_draft', async ({ draft_id }) =>
+        toolkit.deleteDraft(draft_id),
+      ),
     );
   }
 }

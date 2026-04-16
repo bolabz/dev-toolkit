@@ -9,11 +9,61 @@
 import type { gmail_v1 } from 'googleapis';
 import {
   logger,
-  type GmailContext,
   type LabelDetail,
   type LabelOverview,
   type DeleteLabelResult,
-} from './base.js';
+} from '../shared/index.js';
+import type { GmailContext } from './context.js';
+
+// ---------------------------------------------------------------------------
+// Module Factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Create pre-bound label operations from an authenticated context.
+ * @param ctx - The authenticated Gmail context
+ * @returns Pre-bound label operations (getLabels, createLabel, updateLabel, deleteLabel)
+ */
+export function createLabelOps(ctx: GmailContext) {
+  return {
+    /**
+     * Get comprehensive label overview with per-label message/thread counts.
+     * @returns All labels grouped by type (system, user) with counts
+     */
+    getLabels: () => getLabels(ctx),
+    /**
+     * Create a new Gmail label (supports "/" for nesting).
+     * @param name - Label name (e.g., "Finance/Banking" for nested)
+     * @param options - Optional label configuration
+     * @param options.color - Label color configuration
+     * @param options.color.text - Text color hex code
+     * @param options.color.background - Background color hex code
+     * @returns The created label detail
+     */
+    createLabel: (name: string, options?: { color?: { text: string; background: string } }) =>
+      createLabel(ctx, name, options),
+    /**
+     * Update an existing label's name or color (accepts name or ID).
+     * @param nameOrId - Label name or ID to update
+     * @param updates - Fields to change
+     * @param updates.new_name - New display name
+     * @param updates.color - New color configuration
+     * @param updates.color.text - Text color hex code
+     * @param updates.color.background - Background color hex code
+     * @returns The updated label detail
+     */
+    updateLabel: (
+      nameOrId: string,
+      updates: { new_name?: string; color?: { text: string; background: string } },
+    ) => updateLabel(ctx, nameOrId, updates),
+    /**
+     * Permanently delete a Gmail label (messages are unlabeled, not deleted).
+     * @param nameOrId - Label name or ID to delete
+     * @returns Deletion result with affected message and thread counts
+     */
+    deleteLabel: (nameOrId: string) => deleteLabel(ctx, nameOrId),
+  };
+}
 
 const log = logger.child('composed:labels');
 

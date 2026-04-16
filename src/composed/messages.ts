@@ -10,17 +10,7 @@
 
 import type { gmail_v1 } from 'googleapis';
 import {
-  transformMessage,
   logger,
-  normalizeMessageFields,
-  cleanSnippet,
-  hasAttachments,
-  deduplicateContacts,
-  parseContact,
-  parseContactList,
-  headerMap,
-  formatLabelChanges,
-  type GmailContext,
   type SearchAllResult,
   type ThreadMatch,
   type MatchedMessageSummary,
@@ -29,7 +19,73 @@ import {
   type FullMessage,
   type Contact,
   type ModifyResult,
-} from './base.js';
+} from '../shared/index.js';
+import type { GmailContext } from './context.js';
+
+// ---------------------------------------------------------------------------
+// Module Factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Create pre-bound message operations from an authenticated context.
+ * @param ctx - The authenticated Gmail context
+ * @returns Pre-bound message operations (search, read, modify, trash)
+ */
+export function createMessageOps(ctx: GmailContext) {
+  return {
+    /**
+     * Auto-paginating, thread-grouped search with analytics.
+     * @param query - Gmail search query string
+     * @param options - Optional search options
+     * @param options.labelIds - Label IDs for efficient API-level filtering
+     * @returns All matching messages grouped by thread with aggregated analytics
+     */
+    search: (query: string, options?: { labelIds?: string[] }) => search(ctx, query, options),
+    /**
+     * Batch-read messages by ID with composed thread context.
+     * @param messageIds - Message IDs to read
+     * @param options - Processing options
+     * @param options.includeHtml - Whether to include raw HTML alongside plain text
+     * @returns Full messages paired with their thread context
+     */
+    read: (messageIds: string[], options?: { includeHtml?: boolean }) =>
+      read(ctx, messageIds, options),
+    /**
+     * Unified label modification by message IDs, thread IDs, or search query.
+     * @param targets - Targeting options (one of messageIds, threadIds, or query)
+     * @param targets.messageIds - Message IDs to modify
+     * @param targets.threadIds - Thread IDs to modify (all messages in threads)
+     * @param targets.query - Gmail query — modify all matching messages
+     * @param addLabels - Label names to apply
+     * @param removeLabels - Label names to remove
+     * @returns Modification summary with counts and any failed IDs
+     */
+    modify: (
+      targets: { messageIds?: string[]; threadIds?: string[]; query?: string },
+      addLabels?: string[],
+      removeLabels?: string[],
+    ) => modify(ctx, targets, addLabels, removeLabels),
+    /**
+     * Unified trash — move messages and/or threads to Trash (recoverable 30 days).
+     * @param targets - Targeting options
+     * @param targets.messageIds - Message IDs to trash
+     * @param targets.threadIds - Thread IDs to trash
+     * @returns Trash summary with counts and any failed IDs
+     */
+    trash: (targets: { messageIds?: string[]; threadIds?: string[] }) => trash(ctx, targets),
+  };
+}
+import {
+  normalizeMessageFields,
+  cleanSnippet,
+  hasAttachments,
+  deduplicateContacts,
+  parseContact,
+  parseContactList,
+  headerMap,
+  formatLabelChanges,
+} from './helpers.js';
+import { transformMessage } from './transform.js';
 
 const log = logger.child('composed:messages');
 

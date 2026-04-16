@@ -16,9 +16,8 @@ import type { RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import {
   logger,
-  createGmailContext,
-  ComposedClient,
-  type GmailContext,
+  createGmailToolkit,
+  type GmailToolkit,
   resolveToolRegistry,
   type ToolName,
   type ToolConfig,
@@ -38,7 +37,7 @@ import { registerPrompts } from './prompts.js';
 type ToolRegistrar = (
   server: McpServer,
   registry: Record<ToolName, ToolConfig>,
-  composed: ComposedClient,
+  composed: GmailToolkit,
 ) => void;
 
 const log = logger.child('mcp');
@@ -77,18 +76,15 @@ const stubToolRefs: RegisteredTool[] = [];
  *   3. Credentials missing → register static error stubs
  */
 async function startServer() {
-  const credentialsPath = process.env.GMAIL_CREDENTIALS_PATH ?? './credentials.json';
-  const tokenPath = process.env.GMAIL_TOKEN_PATH ?? './token.json';
-
   // Attempt authentication — do not crash if it fails
-  let context: GmailContext | undefined;
+  let toolkit: GmailToolkit | undefined;
 
   try {
-    context = await createGmailContext(credentialsPath, tokenPath);
+    toolkit = await createGmailToolkit();
   } catch (err: unknown) {
     if (err instanceof AuthenticationRequiredError) {
       log.warn('No valid token. Tools will prompt for OAuth sign-in.');
-      registerOAuthStubs(mcpServer, toolRegistry, credentialsPath, tokenPath);
+      registerOAuthStubs(mcpServer, toolRegistry);
     } else if (err instanceof MissingCredentialsError) {
       log.warn('Credentials not found. Tools will show setup instructions.');
       registerUnauthenticatedTools(mcpServer, toolRegistry, err.message);
@@ -99,8 +95,8 @@ async function startServer() {
     }
   }
 
-  if (context) {
-    registerAllTools(context);
+  if (toolkit) {
+    registerAllTools(toolkit);
   }
 
   // Prompts are static — register regardless of auth state
@@ -122,15 +118,14 @@ async function startServer() {
 // ---------------------------------------------------------------------------
 
 /**
- * Register all fully functional tools and resources with an authenticated context.
- * @param context - The authenticated Gmail context
+ * Register all fully functional tools and resources with an authenticated toolkit.
+ * @param toolkit - The authenticated GmailToolkit instance
  */
-function registerAllTools(context: GmailContext): void {
-  const composed = new ComposedClient(context);
+function registerAllTools(toolkit: GmailToolkit): void {
   for (const register of toolRegistrars) {
-    register(mcpServer, toolRegistry, composed);
+    register(mcpServer, toolRegistry, toolkit);
   }
-  registerResources(mcpServer, composed);
+  registerResources(mcpServer, toolkit);
 }
 
 /**
@@ -141,15 +136,8 @@ function registerAllTools(context: GmailContext): void {
  * in their browser, the token is saved and stubs are swapped for real tools.
  * @param server - The MCP server instance
  * @param registry - The tool configuration registry
- * @param credentialsPath - Path to Google OAuth credentials.json
- * @param tokenPath - Path where the OAuth token will be stored
  */
-function registerOAuthStubs(
-  server: McpServer,
-  registry: Record<ToolName, ToolConfig>,
-  credentialsPath: string,
-  tokenPath: string,
-): void {
+function registerOAuthStubs(server: McpServer, registry: Record<ToolName, ToolConfig>): void {
   /** URL from the most recently started auth flow, shown in tool responses. */
   let currentAuthUrl: string | undefined;
 
@@ -166,7 +154,7 @@ function registerOAuthStubs(
         // Start a new auth flow if none is active
         if (authFlowActive == null) {
           try {
-            const { url, completed } = beginAuthFlow(credentialsPath, tokenPath);
+            const { url, completed } = beginAuthFlow();
             currentAuthUrl = url;
             authFlowActive = completed;
 
@@ -174,8 +162,8 @@ function registerOAuthStubs(
             completed
               .then(async () => {
                 log.info('OAuth complete — activating tools.');
-                const ctx = await createGmailContext(credentialsPath, tokenPath);
-                swapToRealTools(ctx);
+                const tk = await createGmailToolkit();
+                swapToRealTools(tk);
               })
               .catch((err: unknown) => {
                 authFlowActive = null;
@@ -215,16 +203,16 @@ function registerOAuthStubs(
 /**
  * Replace all OAuth stubs with fully functional tools and resources.
  * Called automatically when the user completes browser OAuth consent.
- * @param context - The newly authenticated Gmail context
+ * @param toolkit - The newly authenticated GmailToolkit instance
  */
-function swapToRealTools(context: GmailContext): void {
+function swapToRealTools(toolkit: GmailToolkit): void {
   for (const stub of stubToolRefs) {
     stub.remove();
   }
   stubToolRefs.length = 0;
   authFlowActive = null;
 
-  registerAllTools(context);
+  registerAllTools(toolkit);
 
   mcpServer.sendToolListChanged();
   mcpServer.sendResourceListChanged();

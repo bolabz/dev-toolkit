@@ -28,6 +28,10 @@ export {
   type PendingAuth,
 } from './auth.js';
 
+// ── Data Cache ───────────────────────────────────────────────────────────────
+
+export { DataCache, type IDataCache } from './data-cache.js';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 // Only re-exports inferred types — Zod schema values are internal to types.ts.
 

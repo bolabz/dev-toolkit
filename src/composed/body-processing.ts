@@ -4,8 +4,8 @@
  * Transforms raw email bodies into clean, token-efficient plain text.
  * Uses proven libraries for the hard problems, minimal custom code for the rest.
  *
- * Pipeline:
- *   1. MIME → text (postal-mime + html-to-text)
+ * Pipeline (operates on pre-parsed Gmail API payloads, not raw MIME):
+ *   1. Payload → text (findPart + html-to-text)
  *   2. Strip quoted reply chains (email-reply-parser)
  *   3. Strip standard signatures (RFC 3676 "-- \n" and "Sent from...")
  *   4. Remove CID image references
@@ -15,7 +15,7 @@
  */
 
 import { convert as htmlToText } from 'html-to-text';
-import PostalMime from 'postal-mime';
+
 import he from 'he';
 import { logger } from '../shared/index.js';
 
@@ -73,40 +73,6 @@ const HTML_TO_TEXT_OPTIONS = {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
-
-/**
- * Process a raw MIME message body into clean plain text.
- * Not yet wired up — no RAW format fetch path exists in Layer 1.
- * Intended for future use when raw MIME message processing is needed
- * (e.g., imported .eml files or `messages.get(format='RAW')`).
- * Use {@link processMessagePayload} for Gmail API payloads.
- * @internal
- * @param rawMessage - Raw RFC 2822 message (base64url or Buffer)
- * @param options - Processing options for reply stripping and HTML inclusion
- * @param options.stripReplies - Whether to strip quoted reply chains (default: true).
- *   Set to false for thread reads where full conversation context matters.
- * @param options.includeHtml - Whether to also return the raw HTML body.
- * @returns The extracted plain text and optional HTML content
- */
-export async function processBody(
-  rawMessage: string | Buffer,
-  options: { stripReplies?: boolean; includeHtml?: boolean } = {},
-): Promise<{ text: string; html: string | null }> {
-  const { stripReplies = true, includeHtml = false } = options;
-
-  const parsed = await PostalMime.parse(
-    typeof rawMessage === 'string'
-      ? Buffer.from(rawMessage, 'base64url' as BufferEncoding)
-      : rawMessage,
-  );
-
-  const rawText = extractText(parsed);
-
-  return {
-    text: await applyCleaningPipeline(rawText, stripReplies),
-    html: includeHtml && parsed.html != null ? parsed.html : null,
-  };
-}
 
 /**
  * Process a gmail_v1.Schema$Message (already fetched in FULL format)
@@ -234,16 +200,6 @@ function stripResidualHtml(text: string): string {
   }
 
   return text;
-}
-
-function extractText(parsed: { text?: string; html?: string }): string {
-  if (typeof parsed.text === 'string' && parsed.text !== '') {
-    return parsed.text;
-  }
-  if (typeof parsed.html === 'string' && parsed.html !== '') {
-    return htmlToText(parsed.html, HTML_TO_TEXT_OPTIONS);
-  }
-  return '';
 }
 
 async function stripReplyChain(text: string): Promise<string> {

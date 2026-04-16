@@ -27,6 +27,13 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.settings.basic',
 ];
 
+// ---------------------------------------------------------------------------
+// Default Paths — resolved from environment variables
+// ---------------------------------------------------------------------------
+
+const DEFAULT_CREDENTIALS_PATH = process.env.GMAIL_CREDENTIALS_PATH ?? './credentials.json';
+const DEFAULT_TOKEN_PATH = process.env.GMAIL_TOKEN_PATH ?? './token.json';
+
 const REDIRECT_PORT = 3000;
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/oauth2callback`;
 const AUTH_TIMEOUT_MS = 120_000; // 2 minutes to complete browser consent
@@ -89,14 +96,14 @@ export interface PendingAuth {
  *   2. Token exists, refresh valid → silent auto-refresh (invisible, ~100ms)
  *   3. Token exists, refresh invalid → throw (or launch browser if interactive)
  *   4. No token.json → throw (or launch browser if interactive)
- * @param credentialsPath - Path to Google OAuth credentials.json
- * @param tokenPath - Path to stored token.json (created automatically on first auth)
+ * @param credentialsPath - Path to Google OAuth credentials.json (default: GMAIL_CREDENTIALS_PATH env var or ./credentials.json)
+ * @param tokenPath - Path to stored token.json (default: GMAIL_TOKEN_PATH env var or ./token.json)
  * @param options - Authentication options (interactive mode, etc.)
  * @returns Authenticated OAuth2Client ready for Gmail API calls
  */
 export async function ensureAuthenticated(
-  credentialsPath: string,
-  tokenPath: string,
+  credentialsPath: string = DEFAULT_CREDENTIALS_PATH,
+  tokenPath: string = DEFAULT_TOKEN_PATH,
   options: AuthOptions = {},
 ): Promise<OAuth2Client> {
   const { interactive = false } = options;
@@ -151,11 +158,14 @@ export async function ensureAuthenticated(
  * and a promise that resolves once the user completes browser consent and the
  * token is persisted to disk. Used by the MCP server to provide self-service
  * authentication through tool responses.
- * @param credentialsPath - Path to Google OAuth credentials.json
- * @param tokenPath - Path where the OAuth token will be stored
+ * @param credentialsPath - Path to Google OAuth credentials.json (default: GMAIL_CREDENTIALS_PATH env var or ./credentials.json)
+ * @param tokenPath - Path where the OAuth token will be stored (default: GMAIL_TOKEN_PATH env var or ./token.json)
  * @returns The OAuth URL and a completion promise
  */
-export function beginAuthFlow(credentialsPath: string, tokenPath: string): PendingAuth {
+export function beginAuthFlow(
+  credentialsPath: string = DEFAULT_CREDENTIALS_PATH,
+  tokenPath: string = DEFAULT_TOKEN_PATH,
+): PendingAuth {
   const resolvedCredPath = path.resolve(credentialsPath);
   if (!fs.existsSync(resolvedCredPath)) {
     throw new MissingCredentialsError(resolvedCredPath);

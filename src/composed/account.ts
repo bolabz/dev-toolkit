@@ -7,9 +7,29 @@
  * Labels and filters are fetched from their respective caches.
  */
 
-import type { GmailContext, AccountOverview, AccountContext } from './base.js';
+import type { AccountOverview, AccountContext } from '../shared/index.js';
+import type { GmailContext } from './context.js';
 import { getLabels } from './labels.js';
 import { getFilters } from './filters.js';
+
+// ---------------------------------------------------------------------------
+// Module Factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Create pre-bound account operations from an authenticated context.
+ * @param ctx - The authenticated Gmail context
+ * @returns Pre-bound account operations (getAccountContext)
+ */
+export function createAccountOps(ctx: GmailContext) {
+  return {
+    /**
+     * Get full account context: profile + labels + filters + settings (one-call orientation).
+     * @returns Complete account context with all labels and filters
+     */
+    getAccountContext: () => getAccountContext(ctx),
+  };
+}
 
 /**
  * Get account information including profile, vacation, and forwarding settings.

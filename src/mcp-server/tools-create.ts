@@ -6,24 +6,18 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import {
-  toMcpError,
-  toMcpResult,
-  type ComposedClient,
-  type ToolName,
-  type ToolConfig,
-} from './base.js';
+import { withErrorHandling, type GmailToolkit, type ToolName, type ToolConfig } from './base.js';
 
 /**
  * Register all create MCP tools.
  * @param server - The MCP server instance
  * @param toolRegistry - The tool configuration registry
- * @param composed - The composed Layer 2 client
+ * @param toolkit - The Gmail toolkit instance
  */
 export function registerCreateTools(
   server: McpServer,
   toolRegistry: Record<ToolName, ToolConfig>,
-  composed: ComposedClient,
+  toolkit: GmailToolkit,
 ): void {
   // ---------------------------------------------------------------------------
   // gmail_compose — create/update draft, send message, send draft (4 modes)
@@ -52,24 +46,19 @@ export function registerCreateTools(
             .describe('Draft ID (required for update_draft and send_draft modes)'),
         },
       },
-      async (params) => {
-        try {
-          const result = await composed.compose({
-            mode: params.mode,
-            body: params.body,
-            to: params.to,
-            subject: params.subject,
-            cc: params.cc,
-            bcc: params.bcc,
-            content_type: params.content_type,
-            thread_id: params.thread_id,
-            draft_id: params.draft_id,
-          } as Parameters<ComposedClient['compose']>[0]);
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_compose');
-        }
-      },
+      withErrorHandling('gmail_compose', async (params) =>
+        toolkit.compose({
+          mode: params.mode,
+          body: params.body,
+          to: params.to,
+          subject: params.subject,
+          cc: params.cc,
+          bcc: params.bcc,
+          content_type: params.content_type,
+          thread_id: params.thread_id,
+          draft_id: params.draft_id,
+        } as Parameters<GmailToolkit['compose']>[0]),
+      ),
     );
   }
 
@@ -93,14 +82,9 @@ export function registerCreateTools(
             .describe('Label color'),
         },
       },
-      async ({ name, color }) => {
-        try {
-          const result = await composed.createLabel(name, { color });
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_create_label');
-        }
-      },
+      withErrorHandling('gmail_create_label', async ({ name, color }) =>
+        toolkit.createLabel(name, { color }),
+      ),
     );
   }
 
@@ -137,14 +121,9 @@ export function registerCreateTools(
             .describe('Actions to apply on matching messages'),
         },
       },
-      async ({ criteria, actions }) => {
-        try {
-          const result = await composed.createFilter(criteria, actions);
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_create_filter');
-        }
-      },
+      withErrorHandling('gmail_create_filter', async ({ criteria, actions }) =>
+        toolkit.createFilter(criteria, actions),
+      ),
     );
   }
 }

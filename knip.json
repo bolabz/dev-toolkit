@@ -5,8 +5,5 @@
 
   "ignore": ["scripts/debug-raw-api.ts", "scripts/debug-layer2.ts", "scripts/live-test.ts"],
   "ignoreExportsUsedInFile": true,
-  "ignoreIssues": {
-    "src/composed/body-processing.ts": ["exports"]
-  },
   "ignoreBinaries": ["mmdc"]
 }

@@ -5,20 +5,55 @@
  * compose: unified draft/send (4 modes: draft, update_draft, send, send_draft)
  */
 
+import type {
+  DraftSummary,
+  DraftDetail,
+  DeleteResult,
+  SendResult,
+  ComposeMode,
+} from '../shared/index.js';
+import type { GmailContext } from './context.js';
+
+// ---------------------------------------------------------------------------
+// Module Factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Create pre-bound draft operations from an authenticated context.
+ * @param ctx - The authenticated Gmail context
+ * @returns Pre-bound draft operations (getDrafts, compose, deleteDraft)
+ */
+export function createDraftOps(ctx: GmailContext) {
+  return {
+    /**
+     * List all drafts with optional body content (auto-paginated).
+     * @param query - Optional Gmail query to filter drafts
+     * @param includeBody - Whether to include draft body text (default false)
+     * @returns All matching drafts with total count
+     */
+    getDrafts: (query?: string, includeBody?: boolean) => getDrafts(ctx, query, includeBody),
+    /**
+     * Unified compose: create/update draft, send message, or send draft (4 modes).
+     * @param params - Discriminated union by mode (draft, update_draft, send, send_draft)
+     * @returns DraftDetail for draft modes, SendResult for send modes
+     */
+    compose: (params: ComposeMode) => compose(ctx, params),
+    /**
+     * Permanently delete a draft message.
+     * @param draftId - The draft ID to delete
+     * @returns Deletion result
+     */
+    deleteDraft: (draftId: string) => deleteDraft(ctx, draftId),
+  };
+}
 import {
-  type GmailContext,
   parseContactList,
   parseDate,
   hasAttachments,
   headerMap,
   buildRfc2822Message,
-  processMessagePayload,
-  type DraftSummary,
-  type DraftDetail,
-  type DeleteResult,
-  type SendResult,
-  type ComposeMode,
-} from './base.js';
+} from './helpers.js';
+import { processMessagePayload } from './body-processing.js';
 import he from 'he';
 
 // ---------------------------------------------------------------------------

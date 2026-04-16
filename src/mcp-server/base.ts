@@ -13,12 +13,7 @@
  * All domain tool modules (tools-*.ts, resources.ts) and server.ts import from here.
  */
 
-import {
-  createGmailContext,
-  filterCriteriaToQuery,
-  ComposedClient,
-  type GmailContext,
-} from '../composed/index.js';
+import { createGmailToolkit, filterCriteriaToQuery, type GmailToolkit } from '../composed/index.js';
 import {
   logger,
   GmailApiError,
@@ -37,23 +32,13 @@ import { resolveToolRegistry, type ToolName, type ToolConfig } from './tool-regi
 const log = logger.child('mcp');
 
 // ---------------------------------------------------------------------------
-// Layer 2 re-exports — tool modules access composed layer through here
+// Re-exports — tool modules import from here
 // ---------------------------------------------------------------------------
 
-// Using local re-exports (no 'from') to keep one edge per module in the graph.
-export { ComposedClient, type GmailContext };
-export { createGmailContext, filterCriteriaToQuery };
-
-// ---------------------------------------------------------------------------
-// Shared type re-export
-// ---------------------------------------------------------------------------
-
+export { createGmailToolkit };
+export type { GmailToolkit };
+export { filterCriteriaToQuery };
 export type { FilterCriteriaInput, SearchCriteriaInput };
-
-// ---------------------------------------------------------------------------
-// Cross-cutting infrastructure re-exports (logger + auth)
-// ---------------------------------------------------------------------------
-
 export { logger };
 export { beginAuthFlow, MissingCredentialsError, AuthenticationRequiredError };
 
@@ -168,6 +153,30 @@ export function toMcpError(err: unknown, toolName: string): McpToolResult & { is
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(errorDto, null, 2) }],
     isError: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tool handler decorator
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap a tool handler with standardised error handling.
+ * Converts successful results via `toMcpResult` and errors via `toMcpError`.
+ * @param toolName - The MCP tool name (used in error logging and structured error DTO)
+ * @param handler - The async handler that produces the tool's result
+ * @returns An MCP-compatible handler with uniform error handling
+ */
+export function withErrorHandling<TArgs extends unknown[]>(
+  toolName: string,
+  handler: (...args: TArgs) => Promise<unknown>,
+): (...args: TArgs) => Promise<McpToolResult> {
+  return async (...args: TArgs) => {
+    try {
+      return toMcpResult(await handler(...args));
+    } catch (err) {
+      return toMcpError(err, toolName);
+    }
   };
 }
 

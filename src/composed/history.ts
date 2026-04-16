@@ -5,7 +5,29 @@
  * Not exposed as an MCP tool — Layer 2 only for programmatic callers.
  */
 
-import { logger, type GmailContext, type HistoryResult } from './base.js';
+import type { HistoryResult } from '../shared/index.js';
+import { logger } from '../shared/index.js';
+import type { GmailContext } from './context.js';
+
+// ---------------------------------------------------------------------------
+// Module Factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Create pre-bound history operations from an authenticated context.
+ * @param ctx - The authenticated Gmail context
+ * @returns Pre-bound history operations (getHistory)
+ */
+export function createHistoryOps(ctx: GmailContext) {
+  return {
+    /**
+     * Get all mailbox change events since a history ID (auto-paginated).
+     * @param sinceHistoryId - History ID to start from (exclusive)
+     * @returns All change events with the new watermark
+     */
+    getHistory: (sinceHistoryId: string) => getHistory(ctx, sinceHistoryId),
+  };
+}
 
 const log = logger.child('composed:history');
 

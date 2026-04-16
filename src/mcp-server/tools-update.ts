@@ -8,9 +8,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
   filterCriteriaToQuery,
-  toMcpError,
-  toMcpResult,
-  type ComposedClient,
+  withErrorHandling,
+  type GmailToolkit,
   type SearchCriteriaInput,
   type ToolName,
   type ToolConfig,
@@ -20,12 +19,12 @@ import {
  * Register all update MCP tools.
  * @param server - The MCP server instance
  * @param toolRegistry - The tool configuration registry
- * @param composed - The composed Layer 2 client
+ * @param toolkit - The Gmail toolkit instance
  */
 export function registerUpdateTools(
   server: McpServer,
   toolRegistry: Record<ToolName, ToolConfig>,
-  composed: ComposedClient,
+  toolkit: GmailToolkit,
 ): void {
   // ---------------------------------------------------------------------------
   // gmail_modify — add/remove labels on messages by IDs, thread IDs, or query
@@ -73,47 +72,42 @@ export function registerUpdateTools(
           remove_labels: z.array(z.string()).optional().describe('Label names to remove'),
         },
       },
-      async (params) => {
-        try {
-          const targets: { messageIds?: string[]; threadIds?: string[]; query?: string } = {};
+      withErrorHandling('gmail_modify', async (params) => {
+        const targets: { messageIds?: string[]; threadIds?: string[]; query?: string } = {};
 
-          if (params.message_ids != null && params.message_ids.length > 0) {
-            targets.messageIds = params.message_ids;
-          }
-          if (params.thread_ids != null && params.thread_ids.length > 0) {
-            targets.threadIds = params.thread_ids;
-          }
-
-          // Build query from structured criteria + filter_id if no direct IDs
-          if (targets.messageIds == null && targets.threadIds == null) {
-            let filterQuery = '';
-            if (params.filter_id != null) {
-              filterQuery = await composed.resolveFilterCriteria(params.filter_id);
-            }
-
-            const criteria: SearchCriteriaInput = {
-              ...(params.from != null && { from: params.from }),
-              ...(params.to != null && { to: params.to }),
-              ...(params.subject != null && { subject: params.subject }),
-              ...(params.has_attachment != null && { has_attachment: params.has_attachment }),
-              ...(params.negated_query != null && { negated_query: params.negated_query }),
-              ...(params.after != null && { after: params.after }),
-              ...(params.before != null && { before: params.before }),
-              ...(params.labels != null && { labels: params.labels }),
-              ...(params.exclude_labels != null && { exclude_labels: params.exclude_labels }),
-              ...(params.is != null && { is: params.is }),
-            };
-            const criteriaQuery = filterCriteriaToQuery(criteria);
-
-            targets.query = [filterQuery, params.query, criteriaQuery].filter(Boolean).join(' ');
-          }
-
-          const result = await composed.modify(targets, params.add_labels, params.remove_labels);
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_modify');
+        if (params.message_ids != null && params.message_ids.length > 0) {
+          targets.messageIds = params.message_ids;
         }
-      },
+        if (params.thread_ids != null && params.thread_ids.length > 0) {
+          targets.threadIds = params.thread_ids;
+        }
+
+        // Build query from structured criteria + filter_id if no direct IDs
+        if (targets.messageIds == null && targets.threadIds == null) {
+          let filterQuery = '';
+          if (params.filter_id != null) {
+            filterQuery = await toolkit.resolveFilterCriteria(params.filter_id);
+          }
+
+          const criteria: SearchCriteriaInput = {
+            ...(params.from != null && { from: params.from }),
+            ...(params.to != null && { to: params.to }),
+            ...(params.subject != null && { subject: params.subject }),
+            ...(params.has_attachment != null && { has_attachment: params.has_attachment }),
+            ...(params.negated_query != null && { negated_query: params.negated_query }),
+            ...(params.after != null && { after: params.after }),
+            ...(params.before != null && { before: params.before }),
+            ...(params.labels != null && { labels: params.labels }),
+            ...(params.exclude_labels != null && { exclude_labels: params.exclude_labels }),
+            ...(params.is != null && { is: params.is }),
+          };
+          const criteriaQuery = filterCriteriaToQuery(criteria);
+
+          targets.query = [filterQuery, params.query, criteriaQuery].filter(Boolean).join(' ');
+        }
+
+        return toolkit.modify(targets, params.add_labels, params.remove_labels);
+      }),
     );
   }
 
@@ -138,14 +132,9 @@ export function registerUpdateTools(
             .describe('New color'),
         },
       },
-      async ({ label, new_name, color }) => {
-        try {
-          const result = await composed.updateLabel(label, { new_name, color });
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_update_label');
-        }
-      },
+      withErrorHandling('gmail_update_label', async ({ label, new_name, color }) =>
+        toolkit.updateLabel(label, { new_name, color }),
+      ),
     );
   }
 
@@ -185,14 +174,9 @@ export function registerUpdateTools(
             .describe('Action fields to merge with existing filter'),
         },
       },
-      async ({ filter_id, criteria, actions }) => {
-        try {
-          const result = await composed.updateFilter(filter_id, criteria, actions);
-          return toMcpResult(result);
-        } catch (err) {
-          return toMcpError(err, 'gmail_update_filter');
-        }
-      },
+      withErrorHandling('gmail_update_filter', async ({ filter_id, criteria, actions }) =>
+        toolkit.updateFilter(filter_id, criteria, actions),
+      ),
     );
   }
 }
