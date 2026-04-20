@@ -9,8 +9,8 @@ import type { gmail_v1 } from 'googleapis';
 import { google } from 'googleapis';
 import type { OAuth2Client } from 'google-auth-library';
 import PQueue from 'p-queue';
-import { GmailApiError, GmailValidationError } from '../shared/index.js';
-import { logger } from '../shared/index.js';
+import { GmailApiError, GmailValidationError } from '../infra/index.js';
+import { logger } from '../infra/index.js';
 
 const log = logger.child('client:base');
 
@@ -20,6 +20,65 @@ const log = logger.child('client:base');
 
 /** Format options for retrieving Gmail messages, threads, and drafts. */
 export type MessageFormat = 'minimal' | 'metadata' | 'full' | 'raw';
+
+// ---------------------------------------------------------------------------
+// Operation Timeouts
+// ---------------------------------------------------------------------------
+
+/** Max time to wait for a write operation (create/modify/delete/send) response. */
+export const WRITE_TIMEOUT_MS = 60_000;
+
+/** Max time to wait for a read operation (list/get) response. */
+export const READ_TIMEOUT_MS = 120_000;
+
+/** Write-class operation suffixes — anything that mutates state. */
+const WRITE_SUFFIXES = new Set([
+  'create',
+  'modify',
+  'batchModify',
+  'delete',
+  'update',
+  'trash',
+  'untrash',
+  'send',
+  'updateVacation',
+]);
+
+/**
+ * Returns true if the operation label represents a state-mutating call.
+ * @param operation - A QUOTA_COSTS key, e.g. `'messages.modify'`
+ * @returns True for create/modify/delete/send/trash operations
+ */
+function isWriteOp(operation: string): boolean {
+  const suffix = operation.split('.').at(-1) ?? '';
+  return WRITE_SUFFIXES.has(suffix);
+}
+
+/**
+ * Returns a promise that rejects after `ms` milliseconds with a GmailApiError.
+ * Used in Promise.race to enforce per-request timeouts.
+ *
+ * The resulting error has `retryable: false` (code 0, not a network error)
+ * because the server may have already completed the operation.
+ * @param ms - Timeout duration in milliseconds
+ * @param operation - The operation label for error context
+ * @returns A promise that always rejects after the timeout
+ */
+function rejectAfterTimeout(ms: number, operation: string): Promise<never> {
+  return new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(
+        new GmailApiError(
+          operation,
+          new Error(
+            `Operation timed out after ${ms / 1000}s. ` +
+              'The operation may have completed server-side — verify before retrying.',
+          ),
+        ),
+      );
+    }, ms);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Quota Cost Table
@@ -155,7 +214,7 @@ export const RATE_LIMIT_CONFIG = {
 /**
  * Abstract base class for all Gmail API resource clients.
  * Provides rate-limited request execution, batch execution, and pagination
- * shared across all sub-clients. Never instantiated directly.
+ * infra across all sub-clients. Never instantiated directly.
  */
 export abstract class GmailClientBase {
   protected gmail: gmail_v1.Gmail;
@@ -166,8 +225,8 @@ export abstract class GmailClientBase {
   /**
    * Create a new GmailClientBase with the given OAuth2 credentials.
    * @param auth - The authenticated OAuth2 client used for API requests
-   * @param sharedQueue - An optional shared PQueue instance for concurrency control
-   * @param sharedBucket - An optional shared QuotaBucket for quota-unit rate limiting
+   * @param sharedQueue - An optional infra PQueue instance for concurrency control
+   * @param sharedBucket - An optional infra QuotaBucket for quota-unit rate limiting
    */
   constructor(auth: OAuth2Client, sharedQueue?: PQueue, sharedBucket?: QuotaBucket) {
     this.gmail = google.gmail({ version: 'v1', auth });
@@ -202,7 +261,8 @@ export abstract class GmailClientBase {
 
       try {
         await this.quotaBucket.acquire(cost);
-        return (await this.queue.add(fn)) as T;
+        const timeoutMs = isWriteOp(operation) ? WRITE_TIMEOUT_MS : READ_TIMEOUT_MS;
+        return await Promise.race([this.queue.add(fn), rejectAfterTimeout(timeoutMs, operation)]);
       } catch (err) {
         if (err instanceof GmailValidationError) throw err;
         const apiErr = err instanceof GmailApiError ? err : new GmailApiError(operation, err);
