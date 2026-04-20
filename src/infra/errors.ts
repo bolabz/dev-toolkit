@@ -11,9 +11,9 @@
  *
  * Usage
  *   Layer 1 (client/*):   execute() wraps all unrecognised throws → GmailApiError.
- *   Layer 2 (composed/*): throw GmailValidationError for invalid inputs; let GmailApiError
+ *   Layer 2 (api/*): throw GmailValidationError for invalid inputs; let GmailApiError
  *                         bubble unless the operation uses result-as-value semantics.
- *   Layer 3 (mcp-server): catch both types → serialise as GmailToolkitError DTO (see types.ts).
+ *   Layer 3 (mcp): catch both types → serialise as GmailToolkitError DTO (see types.ts).
  */
 
 // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ export class GmailApiError extends Error {
 // ---------------------------------------------------------------------------
 
 /**
- * Thrown by Layer 2 composed operations when caller-supplied input is invalid.
+ * Thrown by Layer 2 api operations when caller-supplied input is invalid.
  * Examples: label name not found in the account, empty message ID array.
  */
 export class GmailValidationError extends Error {
@@ -88,7 +88,7 @@ export class GmailValidationError extends Error {
   /**
    * Creates a new GmailValidationError describing a bad caller input.
    * @param message - Human-readable description of the validation failure
-   * @param operation - The composed operation that failed validation
+   * @param operation - The api operation that failed validation
    * @param field - The field or parameter that failed (optional)
    */
   constructor(message: string, operation: string, field?: string) {

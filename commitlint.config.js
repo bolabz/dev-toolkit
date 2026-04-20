@@ -1,7 +1,7 @@
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    // Scope is required and must be kebab-case (e.g. auth, mcp-server)
+    // Scope is required and must be kebab-case (e.g. auth, mcp)
     'scope-empty': [2, 'never'],
     'scope-case': [2, 'always', 'kebab-case'],
     // Body is required — explain WHY, not just what

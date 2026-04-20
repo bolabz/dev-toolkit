@@ -44,7 +44,7 @@ export function buildOps(ctx: GmailContext) {
 // GmailToolkit — type + factory
 // ---------------------------------------------------------------------------
 
-/** Flat API facade: all Gmail composed operations as a single object. */
+/** Flat API facade: all Gmail api operations as a single object. */
 export type GmailToolkit = ReturnType<typeof buildOps>;
 
 /**

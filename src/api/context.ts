@@ -3,9 +3,9 @@
  *
  * Defines the authenticated context interface and its factory.
  * GmailContext bundles the Layer 1 client with all caches — passed as the
- * first argument to every composed domain operation.
+ * first argument to every api domain operation.
  *
- * Internal to the composed layer — not exported from composed/index.ts.
+ * Internal to the api layer — not exported from api/index.ts.
  */
 
 import type { gmail_v1 } from 'googleapis';
@@ -15,7 +15,7 @@ import {
   DataCache,
   type IDataCache,
   type AccountOverview,
-} from '../shared/index.js';
+} from '../infra/index.js';
 import { convert as htmlToText } from 'html-to-text';
 import { LabelCache, type ILabelCache } from './label-cache.js';
 import { FilterCache, type IFilterCache } from './filter-cache.js';
@@ -26,13 +26,13 @@ import { FilterCache, type IFilterCache } from './filter-cache.js';
 
 /**
  * Authenticated Gmail context containing the API client and all caches.
- * Passed as the first argument to every Layer 2 composed operation.
+ * Passed as the first argument to every Layer 2 api operation.
  * Created via `createGmailContext()`.
  */
 export interface GmailContext {
   /** Layer 1 Gmail API client for direct API calls. */
   readonly client: IGmailClient;
-  /** Label name-to-ID resolution cache shared across all operations. */
+  /** Label name-to-ID resolution cache infra across all operations. */
   readonly labelCache: ILabelCache;
   /** Filter cache with ID-based lookup — invalidated by createFilter/updateFilter/deleteFilter. */
   readonly filterCache: IFilterCache;

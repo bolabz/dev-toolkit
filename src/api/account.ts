@@ -7,7 +7,7 @@
  * Labels and filters are fetched from their respective caches.
  */
 
-import type { AccountOverview, AccountContext } from '../shared/index.js';
+import type { AccountOverview, AccountContext } from '../infra/index.js';
 import type { GmailContext } from './context.js';
 import { getLabels } from './labels.js';
 import { getFilters } from './filters.js';

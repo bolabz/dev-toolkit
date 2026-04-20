@@ -18,7 +18,7 @@ import { SettingsClient, type ISettingsClient } from './settings.js';
 import { HistoryClient, type IHistoryClient } from './history.js';
 
 /**
- * Public contract for the composed Gmail API client.
+ * Public contract for the api Gmail API client.
  * Implemented by GmailClient. Use this type in GmailContext and tests
  * to enable substitution with test doubles.
  */

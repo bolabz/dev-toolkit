@@ -9,5 +9,13 @@
     "sourceMap": true,
     "stripInternal": true
   },
-  "exclude": ["node_modules", "dist", "tests", "scripts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "scripts",
+    "coverage",
+    "./src/AGENTS.md",
+    "./src/CLAUDE.MD"
+  ]
 }

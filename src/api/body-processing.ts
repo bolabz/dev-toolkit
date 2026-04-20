@@ -17,9 +17,9 @@
 import { convert as htmlToText } from 'html-to-text';
 
 import he from 'he';
-import { logger } from '../shared/index.js';
+import { logger } from '../infra/index.js';
 
-const log = logger.child('composed:body-processing');
+const log = logger.child('api:body-processing');
 
 // email-reply-parser v2 ships as CJS with a default export constructor.
 // We type the constructor explicitly to avoid `any` throughout.
@@ -140,7 +140,7 @@ export async function processMessagePayload(
 // ---------------------------------------------------------------------------
 
 /**
- * Apply the shared text-cleaning pipeline (steps 2–7) to extracted email text.
+ * Apply the infra text-cleaning pipeline (steps 2–7) to extracted email text.
  * Shared by both {@link processBody} and {@link processMessagePayload} to
  * eliminate duplication. Operates on already-extracted plain text.
  * @param text - The raw extracted text to clean

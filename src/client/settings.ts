@@ -2,7 +2,7 @@
  * Gmail Client — Settings Module
  *
  * 1:1 mapping to Gmail API v1 settings.* and profile endpoints.
- * All 8 settings endpoints used by getAccount composed operation.
+ * All 8 settings endpoints used by getAccount api operation.
  */
 
 import type { gmail_v1 } from 'googleapis';

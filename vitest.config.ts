@@ -10,7 +10,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/mcp-server.ts', 'src/mcp-server/**'],
+      exclude: ['src/mcp.ts', 'src/mcp/**'],
       reporter: ['text', 'html', 'json-summary', 'lcov'],
       reportsDirectory: 'coverage',
       thresholds: {

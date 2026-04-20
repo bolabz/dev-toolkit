@@ -13,17 +13,18 @@
   },
   "files": [
     "dist/",
+    "docs/architecture.mermaid",
     "docs/gmail-toolkit.api.md",
     "README.md",
     "CHANGELOG.md"
   ],
   "bin": {
-    "gmail-toolkit": "dist/mcp-server/server.js"
+    "gmail-toolkit": "dist/mcp/server.js"
   },
   "scripts": {
     "prepare": "lefthook install",
-    "dev": "tsx src/mcp-server/server.ts",
-    "start": "node dist/mcp-server/server.js",
+    "dev": "tsx src/mcp/server.ts",
+    "start": "node dist/mcp/server.js",
     "setup-auth": "tsx scripts/setup-auth.ts",
     "debug:raw": "tsx scripts/debug-raw-api.ts",
     "debug:layer2": "tsx scripts/debug-layer2.ts",

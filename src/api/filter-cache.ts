@@ -9,7 +9,7 @@
  */
 
 import type { gmail_v1 } from 'googleapis';
-import { DataCache } from '../shared/index.js';
+import { DataCache } from '../infra/index.js';
 
 // ---------------------------------------------------------------------------
 // IFilterCache — public contract
