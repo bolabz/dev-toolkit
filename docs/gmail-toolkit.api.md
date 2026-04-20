@@ -172,11 +172,6 @@ export type MatchedMessageSummary = z.infer<typeof MatchedMessageSummarySchema>;
 // @public
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
 
-// Warning: (ae-forgotten-export) The symbol "MessageWithContextSchema" needs to be exported by the entry point index.d.ts
-//
-// @public
-export type MessageWithContext = z.infer<typeof MessageWithContextSchema>;
-
 // @public
 export class MissingCredentialsError extends Error {
     constructor(resolvedPath: string);
@@ -192,6 +187,16 @@ export interface PendingAuth {
     readonly completed: Promise<void>;
     readonly url: string;
 }
+
+// Warning: (ae-forgotten-export) The symbol "ReadResultSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type ReadResult = z.infer<typeof ReadResultSchema>;
+
+// Warning: (ae-forgotten-export) The symbol "ReadThreadSchema" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type ReadThread = z.infer<typeof ReadThreadSchema>;
 
 // Warning: (ae-forgotten-export) The symbol "SearchAllResultSchema" needs to be exported by the entry point index.d.ts
 //
@@ -217,11 +222,6 @@ export type SearchSummary = z.infer<typeof SearchSummarySchema>;
 //
 // @public
 export type SendResult = z.infer<typeof SendResultSchema>;
-
-// Warning: (ae-forgotten-export) The symbol "ThreadContextSchema" needs to be exported by the entry point index.d.ts
-//
-// @public
-export type ThreadContext = z.infer<typeof ThreadContextSchema>;
 
 // Warning: (ae-forgotten-export) The symbol "ThreadMatchSchema" needs to be exported by the entry point index.d.ts
 //
