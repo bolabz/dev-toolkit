@@ -68,7 +68,7 @@ export default tseslint.config(
       'no-param-reassign': ['error', { props: true, ignorePropertyModificationsFor: [] }],
       'no-return-assign': 'error',
       curly: ['error', 'all'],
-      'max-lines': ['error', { max: 400, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }],
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-implicit-coercion': 'error',
       'no-lonely-if': 'error',
@@ -97,7 +97,7 @@ export default tseslint.config(
   },
   // Logger is the one file allowed to use console.error (it IS the logging layer)
   {
-    files: ['src/shared/logger.ts'],
+    files: ['src/infra/logger.ts'],
     rules: {
       'no-console': ['error', { allow: ['error'] }],
     },

@@ -7,7 +7,7 @@
  *   const results = await toolkit.search('is:unread from:chase');
  */
 
-export { createGmailToolkit, type GmailToolkit } from './composed/index.js';
+export { createGmailToolkit, type GmailToolkit } from './api/index.js';
 
 export {
   ensureAuthenticated,
@@ -52,6 +52,6 @@ export {
   type GmailToolkitError,
   type SearchAllResult,
   type ThreadMatch,
-  type ThreadContext,
-  type MessageWithContext,
-} from './shared/index.js';
+  type ReadThread,
+  type ReadResult,
+} from './infra/index.js';

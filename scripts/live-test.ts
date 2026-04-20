@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * Live integration test — exercises ALL Layer 2 composed operations against
+ * Live integration test — exercises ALL Layer 2 api operations against
  * a real Gmail account with maximized parameter breadth.
  *
  * Every result is validated against its Zod schema. Designed for mailboxes
@@ -12,7 +12,7 @@
  */
 
 import { createGmailToolkit, type GmailToolkit } from '../src/index.js';
-import { logger } from '../src/shared/logger.js';
+import { logger } from '../src/infra/logger.js';
 import {
   AccountContextSchema,
   LabelOverviewSchema,
@@ -24,8 +24,8 @@ import {
   DeleteFilterResultSchema,
   HistoryResultSchema,
   SearchAllResultSchema,
-  MessageWithContextSchema,
-} from '../src/shared/types.js';
+  ReadThreadSchema,
+} from '../src/infra/types.js';
 import type { z } from 'zod';
 
 const log = logger.child('live-test');
@@ -178,11 +178,12 @@ async function main() {
   if (firstMsg !== undefined) {
     try {
       const r = await gmail.read([firstMsg], { includeHtml: true });
-      for (const item of r) validate(MessageWithContextSchema, item, `read[${item.message.id}]`);
-      const m = r[0];
+      for (const thread of r) validate(ReadThreadSchema, thread, `read[${thread.id}]`);
+      const t = r[0];
+      const m = t.messages[0];
       ok(
         `read(1, includeHtml=true)`,
-        `from=${m.message.from.email}, attach=${(m.message.attachments ?? []).length}, html=${m.message.body_html != null ? 'yes' : 'no'}, pos=${m.thread.position}/${m.thread.message_count}`,
+        `from=${m.message.from.email}, attach=${(m.message.attachments ?? []).length}, html=${m.message.body_html != null ? 'yes' : 'no'}, pos=${m.position}/${t.message_count}`,
       );
     } catch (err) {
       fail('read(single)', err);
@@ -241,14 +242,18 @@ async function main() {
   if (batchIds.length >= 5) {
     try {
       const r = await gmail.read(batchIds, { includeHtml: true });
-      for (const m of r) validate(MessageWithContextSchema, m, `ctx[${m.message.id}]`);
-      const uniqueThreads = new Set(r.map((m) => m.thread.id)).size;
-      const withAttach = r.filter((m) => (m.message.attachments ?? []).length > 0).length;
-      const withHtml = r.filter((m) => m.message.body_html != null).length;
-      const positions = r.map((m) => `${m.thread.position}/${m.thread.message_count}`);
+      for (const t of r) validate(ReadThreadSchema, t, `ctx[${t.id}]`);
+      const totalMsgs = r.reduce((n, t) => n + t.messages.length, 0);
+      const withAttach = r
+        .flatMap((t) => t.messages)
+        .filter((e) => (e.message.attachments ?? []).length > 0).length;
+      const withHtml = r
+        .flatMap((t) => t.messages)
+        .filter((e) => e.message.body_html != null).length;
+      const positions = r.flatMap((t) => t.messages.map((e) => `${e.position}/${t.message_count}`));
       ok(
         `read(${batchIds.length} ids)`,
-        `${r.length} msgs, ${uniqueThreads} threads, attach=${withAttach}, html=${withHtml}`,
+        `${totalMsgs} msgs, ${r.length} threads, attach=${withAttach}, html=${withHtml}`,
       );
       log.info(`       positions: [${positions.join(', ')}]`);
     } catch (err) {
