@@ -1,7 +1,7 @@
 #!/usr/bin/env npx tsx
 
 /**
- * Layer 2 full-breadth stress test — calls every read-side Layer 2 composed
+ * Layer 2 full-breadth stress test — calls every read-side Layer 2 api
  * operation through GmailToolkit, validates each response against its Zod
  * schema, and writes 100% untruncated output to scripts/debug-layer2-output.json.
  *
@@ -16,7 +16,7 @@
  */
 
 import { createGmailToolkit } from '../src/index.js';
-import { logger } from '../src/shared/logger.js';
+import { logger } from '../src/infra/logger.js';
 import {
   AccountContextSchema,
   LabelOverviewSchema,
@@ -24,8 +24,8 @@ import {
   FilterOverviewSchema,
   HistoryResultSchema,
   SearchAllResultSchema,
-  MessageWithContextSchema,
-} from '../src/shared/types.js';
+  ReadThreadSchema,
+} from '../src/infra/types.js';
 import type { z } from 'zod';
 import fs from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -156,7 +156,7 @@ async function main() {
   if (firstId !== undefined) {
     const msgs = await capture(output, 'read(msg1)', () => gmail.read([firstId]));
     if (msgs != null && msgs.length > 0) {
-      const parsed = MessageWithContextSchema.safeParse(msgs[0]);
+      const parsed = ReadThreadSchema.safeParse(msgs[0]);
       if (!parsed.success) {
         const issues = parsed.error.issues
           .map((i: z.core.$ZodIssue) => `${i.path.join('.')}: ${i.message}`)
@@ -171,7 +171,7 @@ async function main() {
       gmail.read([secondId], { includeHtml: true }),
     );
     if (msgs != null && msgs.length > 0) {
-      const parsed = MessageWithContextSchema.safeParse(msgs[0]);
+      const parsed = ReadThreadSchema.safeParse(msgs[0]);
       if (!parsed.success) {
         const issues = parsed.error.issues
           .map((i: z.core.$ZodIssue) => `${i.path.join('.')}: ${i.message}`)
@@ -239,7 +239,7 @@ async function main() {
     if (msgs != null) {
       let itemsFailed = 0;
       msgs.forEach((item, i) => {
-        const parsed = MessageWithContextSchema.safeParse(item);
+        const parsed = ReadThreadSchema.safeParse(item);
         if (!parsed.success) {
           itemsFailed++;
           const issues = parsed.error.issues
