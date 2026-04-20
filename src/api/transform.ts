@@ -7,7 +7,7 @@
  */
 
 import type { gmail_v1 } from 'googleapis';
-import type { AttachmentInfo, FullMessage } from '../shared/index.js';
+import type { AttachmentInfo, FullMessage } from '../infra/index.js';
 import type { ILabelCache } from './label-cache.js';
 import { processMessagePayload } from './body-processing.js';
 import { normalizeMessageFields, headerMap, parseContactList, gmailWebUrl } from './helpers.js';

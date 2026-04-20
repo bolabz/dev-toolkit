@@ -11,7 +11,7 @@ import type {
   DeleteResult,
   SendResult,
   ComposeMode,
-} from '../shared/index.js';
+} from '../infra/index.js';
 import type { GmailContext } from './context.js';
 
 // ---------------------------------------------------------------------------

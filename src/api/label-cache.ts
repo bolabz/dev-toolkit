@@ -2,13 +2,13 @@
  * Gmail Toolkit — Label Cache
  *
  * Bidirectional label ID↔name resolution cache backed by DataCache.
- * Used by all composed operations to resolve label IDs to human-readable names.
+ * Used by all api operations to resolve label IDs to human-readable names.
  *
  * Pure L2 module — no cross-layer imports. Receives a loader function
  * at construction time (dependency inversion).
  */
 
-import { DataCache, GmailValidationError } from '../shared/index.js';
+import { DataCache, GmailValidationError } from '../infra/index.js';
 
 // ---------------------------------------------------------------------------
 // ILabelCache — public contract
@@ -42,7 +42,7 @@ interface LabelMaps {
 
 /**
  * Caches Gmail label ID-to-name mappings to avoid repeated API calls.
- * Used by all composed operations to resolve label IDs to human-readable names.
+ * Used by all api operations to resolve label IDs to human-readable names.
  * Delegates caching, concurrency, and invalidation to DataCache<T>.
  */
 export class LabelCache implements ILabelCache {

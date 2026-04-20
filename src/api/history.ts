@@ -5,8 +5,8 @@
  * Not exposed as an MCP tool — Layer 2 only for programmatic callers.
  */
 
-import type { HistoryResult } from '../shared/index.js';
-import { logger } from '../shared/index.js';
+import type { HistoryResult } from '../infra/index.js';
+import { logger } from '../infra/index.js';
 import type { GmailContext } from './context.js';
 
 // ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ export function createHistoryOps(ctx: GmailContext) {
   };
 }
 
-const log = logger.child('composed:history');
+const log = logger.child('api:history');
 
 /**
  * Get all mailbox change events since a given history ID (auto-paginated).

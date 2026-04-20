@@ -10,15 +10,14 @@ import type { GmailToolkit } from './base.js';
 /**
  * Register all MCP resources.
  * @param server - The MCP server instance
- * @param composed - The composed Layer 2 client
+ * @param composed - The api Layer 2 client
  */
 export function registerResources(server: McpServer, composed: GmailToolkit): void {
   server.registerResource(
     'labels',
     'gmail://labels',
     {
-      description:
-        'All Gmail labels with IDs, names, types, and counts. Use to resolve label names and understand organizational structure.',
+      description: 'All Gmail labels with IDs, names, types, and counts.',
     },
     async () => {
       const result = await composed.getLabels();
@@ -26,6 +25,26 @@ export function registerResources(server: McpServer, composed: GmailToolkit): vo
         contents: [
           {
             uri: 'gmail://labels',
+            mimeType: 'application/json',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerResource(
+    'filters',
+    'gmail://filters',
+    {
+      description: 'All Gmail filters with IDs and criteria.',
+    },
+    async () => {
+      const result = await composed.getFilters();
+      return {
+        contents: [
+          {
+            uri: 'gmail://filters',
             mimeType: 'application/json',
             text: JSON.stringify(result, null, 2),
           },
@@ -45,16 +64,7 @@ export function registerResources(server: McpServer, composed: GmailToolkit): vo
           {
             uri: 'gmail://profile',
             mimeType: 'application/json',
-            text: JSON.stringify(
-              {
-                email: account.email,
-                messages_total: account.messages_total,
-                threads_total: account.threads_total,
-                history_id: account.history_id,
-              },
-              null,
-              2,
-            ),
+            text: JSON.stringify(account, null, 2),
           },
         ],
       };

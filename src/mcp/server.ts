@@ -33,7 +33,7 @@ import { registerDeleteTools } from './tools-delete.js';
 import { registerResources } from './resources.js';
 import { registerPrompts } from './prompts.js';
 
-/** Signature shared by all domain-level tool registration functions. */
+/** Signature infra by all domain-level tool registration functions. */
 type ToolRegistrar = (
   server: McpServer,
   registry: Record<ToolName, ToolConfig>,

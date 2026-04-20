@@ -3,7 +3,7 @@
  *
  * Aggregated label CRUD that wraps Layer 1 client calls with LabelCache
  * invalidation and human-readable output shaping. The cache itself lives
- * in label-cache.ts so other composed modules can import it in isolation.
+ * in label-cache.ts so other api modules can import it in isolation.
  */
 
 import type { gmail_v1 } from 'googleapis';
@@ -12,7 +12,7 @@ import {
   type LabelDetail,
   type LabelOverview,
   type DeleteLabelResult,
-} from '../shared/index.js';
+} from '../infra/index.js';
 import type { GmailContext } from './context.js';
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ export function createLabelOps(ctx: GmailContext) {
   };
 }
 
-const log = logger.child('composed:labels');
+const log = logger.child('api:labels');
 
 // ---------------------------------------------------------------------------
 // Shared Label Transformer

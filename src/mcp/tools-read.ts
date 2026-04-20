@@ -32,7 +32,7 @@ export function registerReadTools(
 
   if (toolRegistry.gmail_account.enabled) {
     server.registerTool(
-      'Get Account Settings',
+      'gmail_account',
       { description: toolRegistry.gmail_account.description },
       withErrorHandling('gmail_account', () => toolkit.getAccountContext()),
     );
@@ -44,7 +44,7 @@ export function registerReadTools(
 
   if (toolRegistry.gmail_search.enabled) {
     server.registerTool(
-      'Search Mail w/ Parameters',
+      'gmail_search',
       {
         description: toolRegistry.gmail_search.description,
         inputSchema: {
@@ -122,7 +122,7 @@ export function registerReadTools(
 
   if (toolRegistry.gmail_read.enabled) {
     server.registerTool(
-      'Read Email by Message IDs',
+      'gmail_read',
       {
         description: toolRegistry.gmail_read.description,
         inputSchema: {
@@ -147,7 +147,7 @@ export function registerReadTools(
 
   if (toolRegistry.gmail_get_drafts.enabled) {
     server.registerTool(
-      'Get Drafts',
+      'gmail_get_drafts',
       {
         description: toolRegistry.gmail_get_drafts.description,
         inputSchema: {
