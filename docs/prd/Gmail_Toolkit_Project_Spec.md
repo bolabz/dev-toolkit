@@ -897,7 +897,7 @@ const gmail = await GmailToolkit.create({
   tokenPath: './token.json', // default
 });
 
-// Layer 2 composed operations (recommended)
+// Layer 2 api operations (recommended)
 const results = await gmail.search('is:unread from:chase');
 const message = await gmail.readMessage(results.messages[0].id);
 const labels = await gmail.getLabels();
@@ -1006,7 +1006,7 @@ await gmail.client.drafts.send('draft_id');
 interface GmailToolkitError {
   code: number;
   message: string;
-  operation: string; // Which composed operation failed
+  operation: string; // Which api operation failed
   retryable: boolean;
 }
 ```
