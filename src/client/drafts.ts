@@ -133,7 +133,8 @@ export class DraftsClient extends GmailClientBase implements IDraftsClient {
           return r.data;
         }),
     );
-    const { results } = await this.batchExecute(fns, 'drafts.batchGet');
+    const { results, errors } = await this.batchExecute(fns, 'drafts.batchGet');
+    if (results.length === 0 && errors.length > 0) throw errors[0].error;
     return results;
   }
 
