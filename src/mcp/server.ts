@@ -42,19 +42,40 @@ type ToolRegistrar = (
 
 const log = logger.child('mcp');
 
-const mcpServer = new McpServer({
-  name: 'gmail-toolkit',
-  version: '0.1.0',
-});
-
-const toolRegistry = resolveToolRegistry();
-
 const toolRegistrars: ToolRegistrar[] = [
   registerReadTools,
   registerCreateTools,
   registerUpdateTools,
   registerDeleteTools,
 ];
+
+// ---------------------------------------------------------------------------
+// MCP Server Factory — transport-agnostic, testable
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a fully configured McpServer with all tools, resources, and prompts
+ * registered. Transport-agnostic — caller connects their own transport
+ * (StdioServerTransport for production, InMemoryTransport for tests).
+ * @param toolkit - The authenticated GmailToolkit providing L2 operations
+ * @param registry - Optional tool registry override (defaults to env-resolved registry)
+ * @returns A configured McpServer ready for transport connection
+ */
+export function createMcpServer(
+  toolkit: GmailToolkit,
+  registry?: Record<ToolName, ToolConfig>,
+): McpServer {
+  const reg = registry ?? resolveToolRegistry();
+  const server = new McpServer({ name: 'gmail-toolkit', version: '0.1.0' });
+
+  for (const register of toolRegistrars) {
+    register(server, reg, toolkit);
+  }
+  registerResources(server, toolkit);
+  registerPrompts(server);
+
+  return server;
+}
 
 // ---------------------------------------------------------------------------
 // Auth Flow State
@@ -71,36 +92,44 @@ const stubToolRefs: RegisteredTool[] = [];
  * Initialize auth, register tools, and connect the MCP transport.
  *
  * Three auth states are handled:
- *   1. Authenticated → register fully functional tools + resources
- *   2. Token missing/expired (credentials exist) → register OAuth stubs
- *   3. Credentials missing → register static error stubs
+ *   1. Authenticated → fully configured server via createMcpServer()
+ *   2. Token missing/expired (credentials exist) → OAuth stubs on bare server
+ *   3. Credentials missing → static error stubs on bare server
  */
 async function startServer() {
-  // Attempt authentication — do not crash if it fails
+  const toolRegistry = resolveToolRegistry();
+  let mcpServer: McpServer;
+
+  // Attempt authentication — capture error for branching, do not crash
   let toolkit: GmailToolkit | undefined;
+  let authError: unknown;
 
   try {
     toolkit = await createGmailToolkit();
   } catch (err: unknown) {
-    if (err instanceof AuthenticationRequiredError) {
+    authError = err;
+  }
+
+  if (toolkit) {
+    // Happy path: factory produces a fully configured server
+    mcpServer = createMcpServer(toolkit, toolRegistry);
+  } else {
+    // Auth failed: bare server with prompts + appropriate stubs
+    mcpServer = new McpServer({ name: 'gmail-toolkit', version: '0.1.0' });
+    registerPrompts(mcpServer);
+
+    if (authError instanceof AuthenticationRequiredError) {
       log.warn('No valid token. Tools will prompt for OAuth sign-in.');
       registerOAuthStubs(mcpServer, toolRegistry);
-    } else if (err instanceof MissingCredentialsError) {
+    } else if (authError instanceof MissingCredentialsError) {
       log.warn('Credentials not found. Tools will show setup instructions.');
-      registerUnauthenticatedTools(mcpServer, toolRegistry, err.message);
+      registerUnauthenticatedTools(mcpServer, toolRegistry, authError.message);
     } else {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = authError instanceof Error ? authError.message : String(authError);
       log.warn('Authentication failed:', msg);
       registerUnauthenticatedTools(mcpServer, toolRegistry, msg);
     }
   }
-
-  if (toolkit) {
-    registerAllTools(toolkit);
-  }
-
-  // Prompts are static — register regardless of auth state
-  registerPrompts(mcpServer);
 
   // Log enabled tools
   const enabledTools = Object.entries(toolRegistry)
@@ -113,27 +142,13 @@ async function startServer() {
   await mcpServer.connect(transport);
 }
 
-// ---------------------------------------------------------------------------
-// Tool Registration Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Register all fully functional tools and resources with an authenticated toolkit.
- * @param toolkit - The authenticated GmailToolkit instance
- */
-function registerAllTools(toolkit: GmailToolkit): void {
-  for (const register of toolRegistrars) {
-    register(mcpServer, toolRegistry, toolkit);
-  }
-  registerResources(mcpServer, toolkit);
-}
-
 /**
  * Register OAuth-aware stub tools that start a browser auth flow on first invocation.
  *
  * When any tool is called, the stub generates an OAuth consent URL and starts a
  * localhost redirect listener. The URL is returned to the user. Once they authorize
- * in their browser, the token is saved and stubs are swapped for real tools.
+ * in their browser, the token is saved and stubs are swapped for real tools via
+ * createMcpServer().
  * @param server - The MCP server instance
  * @param registry - The tool configuration registry
  */
@@ -158,12 +173,12 @@ function registerOAuthStubs(server: McpServer, registry: Record<ToolName, ToolCo
             currentAuthUrl = url;
             authFlowActive = completed;
 
-            // Background: swap to real tools when auth completes
+            // Background: swap stubs for real tools when auth completes
             completed
               .then(async () => {
                 log.info('OAuth complete — activating tools.');
                 const tk = await createGmailToolkit();
-                swapToRealTools(tk);
+                swapToRealTools(server, registry, tk);
               })
               .catch((err: unknown) => {
                 authFlowActive = null;
@@ -203,19 +218,29 @@ function registerOAuthStubs(server: McpServer, registry: Record<ToolName, ToolCo
 /**
  * Replace all OAuth stubs with fully functional tools and resources.
  * Called automatically when the user completes browser OAuth consent.
+ * Re-registers tools using the same registrars as createMcpServer().
+ * @param server - The MCP server to update in-place
+ * @param registry - The tool configuration registry
  * @param toolkit - The newly authenticated GmailToolkit instance
  */
-function swapToRealTools(toolkit: GmailToolkit): void {
+function swapToRealTools(
+  server: McpServer,
+  registry: Record<ToolName, ToolConfig>,
+  toolkit: GmailToolkit,
+): void {
   for (const stub of stubToolRefs) {
     stub.remove();
   }
   stubToolRefs.length = 0;
   authFlowActive = null;
 
-  registerAllTools(toolkit);
+  for (const register of toolRegistrars) {
+    register(server, registry, toolkit);
+  }
+  registerResources(server, toolkit);
 
-  mcpServer.sendToolListChanged();
-  mcpServer.sendResourceListChanged();
+  server.sendToolListChanged();
+  server.sendResourceListChanged();
   log.info('Tools activated. Gmail Toolkit is ready.');
 }
 
