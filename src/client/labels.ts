@@ -74,7 +74,8 @@ export class LabelsClient extends GmailClientBase implements ILabelsClient {
     const fns = ids.map(
       (id) => () => this.gmail.users.labels.get({ userId: this.userId, id }).then((r) => r.data),
     );
-    return this.batchExecute(fns, 'labels.batchGet');
+    const { results } = await this.batchExecute(fns, 'labels.batchGet');
+    return results;
   }
 
   /**
