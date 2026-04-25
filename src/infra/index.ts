@@ -15,7 +15,7 @@ export { logger, type Logger, type LogLevel } from './logger.js';
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 
-export { GmailApiError, GmailValidationError } from './errors.js';
+export { GmailApiError, GmailValidationError, extractRetryAfter } from './errors.js';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
