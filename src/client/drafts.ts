@@ -116,7 +116,8 @@ export class DraftsClient extends GmailClientBase implements IDraftsClient {
       (id) => () =>
         this.gmail.users.drafts.get({ userId: this.userId, id, format }).then((r) => r.data),
     );
-    return this.batchExecute(fns, 'drafts.batchGet');
+    const { results } = await this.batchExecute(fns, 'drafts.batchGet');
+    return results;
   }
 
   /**

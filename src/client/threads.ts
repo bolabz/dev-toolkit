@@ -142,7 +142,8 @@ export class ThreadsClient extends GmailClientBase implements IThreadsClient {
           .get({ userId: this.userId, id, format, metadataHeaders })
           .then((r) => r.data),
     );
-    return this.batchExecute(fns, 'threads.batchGet');
+    const { results } = await this.batchExecute(fns, 'threads.batchGet');
+    return results;
   }
 
   /**

@@ -22,6 +22,14 @@ const log = logger.child('client:base');
 /** Format options for retrieving Gmail messages, threads, and drafts. */
 export type MessageFormat = 'minimal' | 'metadata' | 'full' | 'raw';
 
+/** Result of a batch operation with partial failure tracking. */
+export interface BatchResult<T> {
+  /** Successfully resolved items (order may differ from input when some items fail). */
+  results: T[];
+  /** Items that failed after all retries, with their original index in the input array. */
+  errors: { index: number; error: GmailApiError }[];
+}
+
 // ---------------------------------------------------------------------------
 // Operation Timeouts
 // ---------------------------------------------------------------------------
@@ -326,19 +334,51 @@ export abstract class GmailClientBase {
   }
 
   /**
-   * Batch execute multiple API calls through the rate limiter.
-   * Groups calls into batches of up to 100 (Gmail batch limit).
+   * Batch execute multiple API calls with partial failure tracking.
+   *
+   * Uses Promise.allSettled() to collect both successes and failures rather
+   * than aborting on the first error. Processes in chunks of `chunkSize` to
+   * bound memory pressure from queued closures on large batches.
    *
    * Note: googleapis doesn't natively support HTTP batching, so this
    * uses concurrent individual calls through p-queue. The rate limiter
-   * ensures we stay within quota. For true HTTP batching, we'd need
-   * to construct multipart requests manually — a future optimization.
+   * ensures we stay within quota.
    * @param fns - An array of async functions to execute concurrently
    * @param operation - A label used in error messages for all items in the batch
-   * @returns The resolved results of all API calls
+   * @param chunkSize - Max items to process concurrently per chunk (default 100)
+   * @returns Results and indexed errors for failed items
    */
-  protected async batchExecute<T>(fns: (() => Promise<T>)[], operation = 'unknown'): Promise<T[]> {
-    return Promise.all(fns.map((fn) => this.execute(fn, operation)));
+  protected async batchExecute<T>(
+    fns: (() => Promise<T>)[],
+    operation = 'unknown',
+    chunkSize = 100,
+  ): Promise<BatchResult<T>> {
+    const results: T[] = [];
+    const errors: { index: number; error: GmailApiError }[] = [];
+    let globalIndex = 0;
+
+    for (let i = 0; i < fns.length; i += chunkSize) {
+      const chunk = fns.slice(i, i + chunkSize);
+      const settled = await Promise.allSettled(chunk.map((fn) => this.execute(fn, operation)));
+      for (const outcome of settled) {
+        if (outcome.status === 'fulfilled') {
+          results.push(outcome.value);
+        } else {
+          const err =
+            outcome.reason instanceof GmailApiError
+              ? outcome.reason
+              : new GmailApiError(operation, outcome.reason);
+          errors.push({ index: globalIndex, error: err });
+        }
+        globalIndex++;
+      }
+    }
+
+    if (errors.length > 0) {
+      log.warn(`${operation}: ${errors.length}/${fns.length} items failed`);
+    }
+
+    return { results, errors };
   }
 
   /**

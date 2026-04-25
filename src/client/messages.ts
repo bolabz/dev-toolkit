@@ -162,7 +162,8 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
           })
           .then((r) => r.data),
     );
-    return this.batchExecute(fns, 'messages.batchGet');
+    const { results } = await this.batchExecute(fns, 'messages.batchGet');
+    return results;
   }
 
   /**
