@@ -21,6 +21,16 @@ export interface ListMessagesOptions {
   maxPages?: number;
 }
 
+/** Options for importing a message into the mailbox with SMTP-style delivery. */
+export interface ImportMessageOptions {
+  /** Source for Gmail's internal date. Default: 'receivedTime'. */
+  internalDateSource?: 'receivedTime' | 'dateHeader';
+  /** Bypass spam classifier for this message. Default: false. */
+  neverMarkSpam?: boolean;
+  /** Extract and add calendar events from the message. Default: false. */
+  processForCalendar?: boolean;
+}
+
 /** Public contract for Gmail message operations. */
 export interface IMessagesClient {
   /** List message IDs matching a query. Pass allPages to auto-paginate. */
@@ -64,6 +74,8 @@ export interface IMessagesClient {
     messageId: string,
     attachmentId: string,
   ) => Promise<{ data: string; size: number }>;
+  /** Import a message with SMTP-style delivery scanning and classification. */
+  import: (raw: string, options?: ImportMessageOptions) => Promise<gmail_v1.Schema$Message>;
 }
 
 /** Client for Gmail messages.* API endpoints with rate limiting. */
@@ -303,5 +315,29 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
       data: response.data.data ?? '',
       size: response.data.size ?? 0,
     };
+  }
+
+  /**
+   * Import a message with standard email delivery scanning and classification.
+   * Similar to receiving via SMTP — Gmail runs spam filtering, calendar
+   * extraction, and label rules. Does not send the message.
+   * @param raw - The base64url-encoded RFC 2822 message to import
+   * @param options - Import behavior options (spam bypass, calendar processing, date source)
+   * @returns The imported message object with ID and thread info
+   */
+  async import(raw: string, options: ImportMessageOptions = {}): Promise<gmail_v1.Schema$Message> {
+    const response = await this.execute(
+      () =>
+        this.gmail.users.messages.import({
+          userId: this.userId,
+          requestBody: { raw },
+          internalDateSource: options.internalDateSource,
+          neverMarkSpam: options.neverMarkSpam,
+          processForCalendar: options.processForCalendar,
+        }),
+      'messages.import',
+    );
+    validateResponse(GmailMessageSchema, response.data, 'messages.import');
+    return response.data;
   }
 }

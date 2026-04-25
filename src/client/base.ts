@@ -50,6 +50,7 @@ const WRITE_SUFFIXES = new Set([
   'trash',
   'untrash',
   'send',
+  'import',
   'updateVacation',
 ]);
 
@@ -123,6 +124,7 @@ const QUOTA_COSTS: Record<string, number> = {
   'messages.untrash': 5,
   'messages.delete': 10,
   'messages.getAttachment': 5,
+  'messages.import': 25,
   'threads.list': 10,
   'threads.get': 10,
   'threads.modify': 10,
