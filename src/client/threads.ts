@@ -6,6 +6,7 @@
 
 import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase, type MessageFormat } from './base.js';
+import { GmailThreadSchema, GmailThreadListSchema, validateResponse } from './schemas.js';
 
 /** Options for listing Gmail threads (single page or auto-paginated). */
 export interface ListThreadsOptions {
@@ -83,6 +84,7 @@ export class ThreadsClient extends GmailClientBase implements IThreadsClient {
           }),
         'threads.list',
       );
+      validateResponse(GmailThreadListSchema, response.data, 'threads.list');
       if (resultSizeEstimate === 0) {
         resultSizeEstimate = response.data.resultSizeEstimate ?? 0;
       }
@@ -121,6 +123,7 @@ export class ThreadsClient extends GmailClientBase implements IThreadsClient {
       () => this.gmail.users.threads.get({ userId: this.userId, id, format, metadataHeaders }),
       'threads.get',
     );
+    validateResponse(GmailThreadSchema, response.data, 'threads.get');
     return response.data;
   }
 
@@ -140,7 +143,10 @@ export class ThreadsClient extends GmailClientBase implements IThreadsClient {
       (id) => () =>
         this.gmail.users.threads
           .get({ userId: this.userId, id, format, metadataHeaders })
-          .then((r) => r.data),
+          .then((r) => {
+            validateResponse(GmailThreadSchema, r.data, 'threads.batchGet');
+            return r.data;
+          }),
     );
     const { results } = await this.batchExecute(fns, 'threads.batchGet');
     return results;
