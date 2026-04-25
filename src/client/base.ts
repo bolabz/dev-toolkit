@@ -8,6 +8,7 @@
 import type { gmail_v1 } from 'googleapis';
 import { google } from 'googleapis';
 import type { OAuth2Client } from 'google-auth-library';
+import type { Agent as HttpsAgent } from 'node:https';
 import PQueue from 'p-queue';
 import { GmailApiError, GmailValidationError, extractRetryAfter } from '../infra/index.js';
 import { logger } from '../infra/index.js';
@@ -219,6 +220,26 @@ export const RATE_LIMIT_CONFIG = {
 };
 
 // ---------------------------------------------------------------------------
+// HTTP Agent Configuration (connection pooling)
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared HTTPS agent configuration for connection reuse.
+ *
+ * Without keepAlive, each of the 10 concurrent requests opens a new TCP
+ * connection + TLS handshake (~50–100 ms overhead each). With keepAlive,
+ * subsequent requests reuse warm connections. LIFO scheduling preferentially
+ * reuses the most-recently-used socket (more likely to still be warm).
+ */
+export const HTTP_AGENT_CONFIG = {
+  keepAlive: true,
+  keepAliveMsecs: 30_000,
+  maxSockets: 25,
+  maxFreeSockets: 10,
+  scheduling: 'lifo' as const,
+};
+
+// ---------------------------------------------------------------------------
 // Base Client
 // ---------------------------------------------------------------------------
 
@@ -238,9 +259,19 @@ export abstract class GmailClientBase {
    * @param auth - The authenticated OAuth2 client used for API requests
    * @param sharedQueue - An optional infra PQueue instance for concurrency control
    * @param sharedBucket - An optional infra QuotaBucket for quota-unit rate limiting
+   * @param sharedAgent - An optional shared HTTPS agent for connection pooling
    */
-  constructor(auth: OAuth2Client, sharedQueue?: PQueue, sharedBucket?: QuotaBucket) {
-    this.gmail = google.gmail({ version: 'v1', auth });
+  constructor(
+    auth: OAuth2Client,
+    sharedQueue?: PQueue,
+    sharedBucket?: QuotaBucket,
+    sharedAgent?: HttpsAgent,
+  ) {
+    this.gmail = google.gmail({
+      version: 'v1',
+      auth,
+      ...(sharedAgent != null ? { agent: sharedAgent } : {}),
+    });
     this.queue = sharedQueue ?? new PQueue(RATE_LIMIT_CONFIG);
     this.quotaBucket = sharedBucket ?? new QuotaBucket();
   }

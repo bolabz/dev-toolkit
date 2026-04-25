@@ -7,8 +7,9 @@
  */
 
 import type { OAuth2Client } from 'google-auth-library';
+import { Agent as HttpsAgent } from 'node:https';
 import PQueue from 'p-queue';
-import { RATE_LIMIT_CONFIG, QuotaBucket } from './base.js';
+import { RATE_LIMIT_CONFIG, QuotaBucket, HTTP_AGENT_CONFIG } from './base.js';
 import { MessagesClient, type IMessagesClient } from './messages.js';
 import { ThreadsClient, type IThreadsClient } from './threads.js';
 import { LabelsClient, type ILabelsClient } from './labels.js';
@@ -30,6 +31,8 @@ export interface IGmailClient {
   readonly filters: IFiltersClient;
   readonly settings: ISettingsClient;
   readonly history: IHistoryClient;
+  /** Release all held resources (connections, timers). Optional for test doubles. */
+  destroy?: () => void;
 }
 
 /**
@@ -46,20 +49,34 @@ export class GmailClient implements IGmailClient {
   readonly settings: SettingsClient;
   readonly history: HistoryClient;
 
+  private readonly agent: HttpsAgent;
+  private readonly queue: PQueue;
+
   /**
    * Create a new GmailClient with authenticated sub-clients sharing a
-   * concurrency limiter (PQueue) and quota-unit rate limiter (QuotaBucket).
+   * concurrency limiter (PQueue), quota-unit rate limiter (QuotaBucket),
+   * and HTTPS agent for connection pooling.
    * @param auth - The authenticated OAuth2 client for Gmail API access
    */
   constructor(auth: OAuth2Client) {
-    const sharedQueue = new PQueue(RATE_LIMIT_CONFIG);
+    this.queue = new PQueue(RATE_LIMIT_CONFIG);
     const sharedBucket = new QuotaBucket();
-    this.messages = new MessagesClient(auth, sharedQueue, sharedBucket);
-    this.threads = new ThreadsClient(auth, sharedQueue, sharedBucket);
-    this.labels = new LabelsClient(auth, sharedQueue, sharedBucket);
-    this.drafts = new DraftsClient(auth, sharedQueue, sharedBucket);
-    this.filters = new FiltersClient(auth, sharedQueue, sharedBucket);
-    this.settings = new SettingsClient(auth, sharedQueue, sharedBucket);
-    this.history = new HistoryClient(auth, sharedQueue, sharedBucket);
+    this.agent = new HttpsAgent(HTTP_AGENT_CONFIG);
+    this.messages = new MessagesClient(auth, this.queue, sharedBucket, this.agent);
+    this.threads = new ThreadsClient(auth, this.queue, sharedBucket, this.agent);
+    this.labels = new LabelsClient(auth, this.queue, sharedBucket, this.agent);
+    this.drafts = new DraftsClient(auth, this.queue, sharedBucket, this.agent);
+    this.filters = new FiltersClient(auth, this.queue, sharedBucket, this.agent);
+    this.settings = new SettingsClient(auth, this.queue, sharedBucket, this.agent);
+    this.history = new HistoryClient(auth, this.queue, sharedBucket, this.agent);
+  }
+
+  /**
+   * Release all held resources: close keep-alive connections and drain the queue.
+   * Call on shutdown to prevent the Node.js process from hanging on idle sockets.
+   */
+  destroy(): void {
+    this.agent.destroy();
+    this.queue.clear();
   }
 }
