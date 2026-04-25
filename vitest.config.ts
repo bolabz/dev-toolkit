@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // Only run unit tests — integration tests use vitest.integration.config.ts
+    include: ['tests/unit/**/*.test.ts'],
     // Reset mock state and restore spied implementations between every test
     clearMocks: true,
     restoreMocks: true,
