@@ -129,3 +129,22 @@ function isNetworkError(err: unknown): boolean {
   const code = (err as Record<string, unknown>).code;
   return typeof code === 'string' && RETRYABLE_NETWORK_CODES.has(code);
 }
+
+/**
+ * Extract the Retry-After header value (in milliseconds) from a GaxiosError.
+ *
+ * Gmail API returns this header on HTTP 429 to indicate how long to wait.
+ * GaxiosError stores the response on `.response.headers`.
+ * @param err - The original error (typically a GaxiosError)
+ * @returns The wait time in milliseconds, or undefined if the header is absent
+ */
+export function extractRetryAfter(err: unknown): number | undefined {
+  if (err == null || typeof err !== 'object') return undefined;
+  const e = err as Record<string, unknown>;
+  const response = e.response as Record<string, unknown> | undefined;
+  const headers = response?.headers as Record<string, string> | undefined;
+  const val = headers?.['retry-after'];
+  if (val == null) return undefined;
+  const seconds = Number(val);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+}

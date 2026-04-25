@@ -9,7 +9,7 @@ import type { gmail_v1 } from 'googleapis';
 import { google } from 'googleapis';
 import type { OAuth2Client } from 'google-auth-library';
 import PQueue from 'p-queue';
-import { GmailApiError, GmailValidationError } from '../infra/index.js';
+import { GmailApiError, GmailValidationError, extractRetryAfter } from '../infra/index.js';
 import { logger } from '../infra/index.js';
 
 const log = logger.child('client:base');
@@ -265,7 +265,12 @@ export abstract class GmailClientBase {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
-        const delayMs = Math.min(1_000 * Math.pow(2, attempt - 1), 30_000);
+        // Prefer Retry-After header from 429 responses, fall back to exponential backoff.
+        // Decorrelated jitter (0.5–1.0x) breaks thundering-herd synchronisation
+        // across concurrent requests while maintaining a reasonable minimum delay.
+        const retryAfterMs = extractRetryAfter(lastErr?.cause);
+        const baseDelay = retryAfterMs ?? Math.min(1_000 * Math.pow(2, attempt - 1), 30_000);
+        const delayMs = Math.round(baseDelay * (0.5 + Math.random() * 0.5));
         log.debug(`Retrying ${operation} (attempt ${attempt}/${maxRetries}, delay ${delayMs} ms)`);
         await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
       }
@@ -277,7 +282,10 @@ export abstract class GmailClientBase {
       } catch (err) {
         if (err instanceof GmailValidationError) throw err;
         const apiErr = err instanceof GmailApiError ? err : new GmailApiError(operation, err);
-        if (!apiErr.retryable || attempt === maxRetries) throw apiErr;
+        // Allow one retry on 401 (transient token refresh failure) — google-auth-library
+        // will attempt a transparent refresh on the next call.
+        const canRetry = apiErr.retryable || (apiErr.code === 401 && attempt === 0);
+        if (!canRetry || attempt === maxRetries) throw apiErr;
         lastErr = apiErr;
       }
     }
