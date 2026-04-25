@@ -8,9 +8,6 @@ scripts/**/*.js.map
 scripts/**/*.d.ts
 scripts/**/*.d.ts.map
 
-# Debug output
-scripts/debug-raw-output.json
-scripts/debug-layer2-output.json
 # Auth credentials (NEVER commit these)
 credentials.json
 token.json
@@ -35,6 +32,9 @@ docs/architecture.svg
 
 # Test coverage
 coverage/
+
+# Integration test fixtures (generated, contain live data)
+tests/integration/**/fixtures/
 
 # API Extractor temp output
 temp/

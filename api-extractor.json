@@ -21,11 +21,11 @@
     },
     "extractorMessageReporting": {
       "default": { "logLevel": "error" },
-      "ae-missing-release-tag": { "logLevel": "none" }
+      "ae-missing-release-tag": { "logLevel": "error" }
     },
     "tsdocMessageReporting": {
       "default": { "logLevel": "error" },
-      "tsdoc-param-tag-with-invalid-name": { "logLevel": "none" }
+      "tsdoc-param-tag-with-invalid-name": { "logLevel": "error" }
     }
   }
 }

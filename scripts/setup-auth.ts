@@ -10,7 +10,7 @@
  * happens seamlessly on first use in any mode.
  */
 
-import { ensureAuthenticated } from '../src/infra/auth.js';
+import { ensureAuthenticated } from '../src/index.js';
 import { logger } from '../src/infra/logger.js';
 
 const log = logger.child('setup');

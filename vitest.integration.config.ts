@@ -13,5 +13,11 @@ export default defineConfig({
     // No coverage — integration tests only exercise the happy path.
     // Coverage thresholds belong on unit tests where edge cases are tested.
     coverage: { enabled: false },
+    // Environment variable defaults for integration tests.
+    // Override from the shell: SAVE_FIXTURES=1 npm run test:integration
+    env: {
+      // When '1', tests write response JSON to tests/integration/**/fixtures/ (gitignored).
+      SAVE_FIXTURES: process.env.SAVE_FIXTURES ?? '1',
+    },
   },
 });

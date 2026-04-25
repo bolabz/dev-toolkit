@@ -79,7 +79,7 @@ function isWriteOp(operation: string): boolean {
  * @param operation - The operation label for error context
  * @returns The resolved result, or rejects with a timeout GmailApiError
  */
-function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
   // The Promise constructor runs synchronously, so timer is assigned before
   // .finally() can fire. Typed as | undefined to avoid non-null assertion.
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -96,9 +96,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Pro
       );
     }, ms);
   });
-  return Promise.race([promise, timeout]).finally(() => {
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
     if (timer != null) clearTimeout(timer);
-  });
+  }
 }
 
 // ---------------------------------------------------------------------------
