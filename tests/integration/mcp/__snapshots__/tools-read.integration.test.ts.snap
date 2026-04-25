@@ -1,0 +1,167 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`tools-read — Live API > gmail_account > returns complete account context with all sections > gmail_account response shape 1`] = `
+{
+  "delegates": "[]",
+  "email": "string",
+  "filters": {
+    "filters": "object",
+    "total": "number",
+  },
+  "forwarding": {
+    "enabled": "boolean",
+  },
+  "forwarding_addresses": "[]",
+  "history_id": "string",
+  "imap": {
+    "auto_expunge": "boolean",
+    "enabled": "boolean",
+    "expunge_behavior": "string",
+  },
+  "labels": {
+    "categories": "object",
+    "summary": "object",
+    "system_labels": "object",
+    "user_labels": "object",
+  },
+  "messages_total": "number",
+  "pop": {
+    "access_window": "string",
+    "disposition": "string",
+    "enabled": "boolean",
+  },
+  "send_as_aliases": [
+    "object",
+  ],
+  "threads_total": "number",
+  "vacation": {
+    "enabled": "boolean",
+    "restrict_to_contacts": "boolean",
+    "subject": "string",
+  },
+}
+`;
+
+exports[`tools-read — Live API > gmail_get_drafts > lists drafts with metadata > gmail_get_drafts response shape 1`] = `
+{
+  "drafts": [
+    {
+      "cc": "object",
+      "date": "string",
+      "draft_id": "string",
+      "has_attachments": "boolean",
+      "message_id": "string",
+      "size_bytes": "number",
+      "snippet": "string",
+      "subject": "string",
+      "thread_id": "string",
+      "to": "object",
+    },
+  ],
+  "total": "number",
+}
+`;
+
+exports[`tools-read — Live API > gmail_read > reads a single message with full body text > gmail_read thread shape 1`] = `
+{
+  "date_range": {
+    "first": "string",
+  },
+  "has_unread": "boolean",
+  "id": "string",
+  "message_count": "number",
+  "messages": [
+    {
+      "message": "object",
+      "position": "number",
+    },
+  ],
+  "participants": [
+    {
+      "email": "string",
+      "name": "string",
+    },
+  ],
+  "subject": "string",
+}
+`;
+
+exports[`tools-read — Live API > gmail_search > searches with raw query string > gmail_search response shape 1`] = `
+{
+  "summary": {
+    "attachment_count": "number",
+    "categories": {
+      "CATEGORY_PERSONAL": "number",
+      "CATEGORY_PROMOTIONS": "number",
+      "CATEGORY_SOCIAL": "number",
+      "CATEGORY_UPDATES": "number",
+    },
+    "date_histogram": [
+      "object",
+    ],
+    "domains": [
+      "object",
+    ],
+    "important_count": "number",
+    "labels": {
+      "Automotive": "number",
+      "CATEGORY_PERSONAL": "number",
+      "CATEGORY_PROMOTIONS": "number",
+      "CATEGORY_SOCIAL": "number",
+      "CATEGORY_UPDATES": "number",
+      "Careers": "number",
+      "DRAFT": "number",
+      "Finance/SSFCU": "number",
+      "Finance/USAA": "number",
+      "Finance/tastytrade": "number",
+      "Fitness": "number",
+      "Healthcare": "number",
+      "IMPORTANT": "number",
+      "INBOX": "number",
+      "Promotions": "number",
+      "Reading/Medium": "number",
+      "SENT": "number",
+      "Tech/Google": "number",
+      "Travel": "number",
+      "UNREAD": "number",
+      "Utilities/Frontier": "number",
+      "Utilities/Spectrum": "number",
+    },
+    "mailing_list_count": "number",
+    "read_rate_by_sender": [
+      "object",
+    ],
+    "senders": [
+      "object",
+    ],
+    "size_stats": {
+      "avg_bytes": "number",
+      "largest": "object",
+      "p50_bytes": "number",
+      "p95_bytes": "number",
+      "total_bytes": "number",
+    },
+    "starred_count": "number",
+    "thread_depth": {
+      "deepest": "object",
+      "multi_message": "number",
+      "single_message": "number",
+    },
+    "unread_count": "number",
+  },
+  "threads": [
+    {
+      "date_range": "object",
+      "has_unread": "boolean",
+      "id": "string",
+      "matched_count": "number",
+      "matched_messages": "object",
+      "message_count": "number",
+      "participants": "object",
+      "subject": "string",
+    },
+  ],
+  "total_messages": "number",
+  "total_threads": "number",
+}
+`;
