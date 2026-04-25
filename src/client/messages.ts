@@ -34,12 +34,14 @@ export interface IMessagesClient {
     id: string,
     format?: MessageFormat,
     metadataHeaders?: string[],
+    fields?: string,
   ) => Promise<gmail_v1.Schema$Message>;
   /** Get multiple messages by ID concurrently through the rate limiter. */
   batchGet: (
     ids: string[],
     format?: MessageFormat,
     metadataHeaders?: string[],
+    fields?: string,
   ) => Promise<gmail_v1.Schema$Message[]>;
   /** Modify labels on a single message. */
   modify: (
@@ -121,12 +123,14 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
    * @param id - The Gmail message ID
    * @param format - Response format (full, metadata, minimal, raw)
    * @param metadataHeaders - Specific headers to include in metadata format
+   * @param fields - Gmail API fields parameter for partial responses
    * @returns The raw Gmail API message object
    */
   async get(
     id: string,
     format: MessageFormat = 'full',
     metadataHeaders?: string[],
+    fields?: string,
   ): Promise<gmail_v1.Schema$Message> {
     const response = await this.execute(
       () =>
@@ -135,6 +139,7 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
           id,
           format,
           metadataHeaders,
+          fields,
         }),
       'messages.get',
     );
@@ -147,12 +152,14 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
    * @param ids - The Gmail message IDs to fetch
    * @param format - Response format for all messages
    * @param metadataHeaders - Specific headers to include in metadata format
+   * @param fields - Gmail API fields parameter for partial responses
    * @returns The raw Gmail API message objects
    */
   async batchGet(
     ids: string[],
     format: MessageFormat = 'full',
     metadataHeaders?: string[],
+    fields?: string,
   ): Promise<gmail_v1.Schema$Message[]> {
     const fns = ids.map(
       (id) => () =>
@@ -162,6 +169,7 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
             id,
             format,
             metadataHeaders,
+            fields,
           })
           .then((r) => {
             validateResponse(GmailMessageSchema, r.data, 'messages.batchGet');

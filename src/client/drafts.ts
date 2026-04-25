@@ -28,9 +28,13 @@ export interface IDraftsClient {
     resultSizeEstimate: number;
   }>;
   /** Get a single draft by ID with its full message content. */
-  get: (id: string, format?: MessageFormat) => Promise<gmail_v1.Schema$Draft>;
+  get: (id: string, format?: MessageFormat, fields?: string) => Promise<gmail_v1.Schema$Draft>;
   /** Get multiple drafts by ID concurrently through the rate limiter. */
-  batchGet: (ids: string[], format?: MessageFormat) => Promise<gmail_v1.Schema$Draft[]>;
+  batchGet: (
+    ids: string[],
+    format?: MessageFormat,
+    fields?: string,
+  ) => Promise<gmail_v1.Schema$Draft[]>;
   /** Create a new draft from a base64url-encoded RFC 2822 message. */
   create: (raw: string, threadId?: string) => Promise<gmail_v1.Schema$Draft>;
   /** Replace the content of an existing draft. */
@@ -94,11 +98,16 @@ export class DraftsClient extends GmailClientBase implements IDraftsClient {
    * Get a single draft by ID with its full message content.
    * @param id - The Gmail draft ID
    * @param format - Response format for the underlying message
+   * @param fields - Gmail API fields parameter for partial responses
    * @returns The raw Gmail API draft object
    */
-  async get(id: string, format: MessageFormat = 'full'): Promise<gmail_v1.Schema$Draft> {
+  async get(
+    id: string,
+    format: MessageFormat = 'full',
+    fields?: string,
+  ): Promise<gmail_v1.Schema$Draft> {
     const response = await this.execute(
-      () => this.gmail.users.drafts.get({ userId: this.userId, id, format }),
+      () => this.gmail.users.drafts.get({ userId: this.userId, id, format, fields }),
       'drafts.get',
     );
     validateResponse(GmailDraftSchema, response.data, 'drafts.get');
@@ -109,15 +118,17 @@ export class DraftsClient extends GmailClientBase implements IDraftsClient {
    * Get multiple drafts by ID (concurrent through rate limiter).
    * @param ids - The Gmail draft IDs to fetch
    * @param format - Response format for the underlying messages
+   * @param fields - Gmail API fields parameter for partial responses
    * @returns The raw Gmail API draft objects
    */
   async batchGet(
     ids: string[],
     format: MessageFormat = 'metadata',
+    fields?: string,
   ): Promise<gmail_v1.Schema$Draft[]> {
     const fns = ids.map(
       (id) => () =>
-        this.gmail.users.drafts.get({ userId: this.userId, id, format }).then((r) => {
+        this.gmail.users.drafts.get({ userId: this.userId, id, format, fields }).then((r) => {
           validateResponse(GmailDraftSchema, r.data, 'drafts.batchGet');
           return r.data;
         }),
