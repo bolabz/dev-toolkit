@@ -6,6 +6,7 @@
 
 import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase } from './base.js';
+import { GmailHistoryListSchema, validateResponse } from './schemas.js';
 
 /** Options for listing mailbox history changes (single page or auto-paginated). */
 export interface ListHistoryOptions {
@@ -56,6 +57,7 @@ export class HistoryClient extends GmailClientBase implements IHistoryClient {
           }),
         'history.list',
       );
+      validateResponse(GmailHistoryListSchema, response.data, 'history.list');
       return {
         items: response.data.history ?? [],
         nextPageToken: response.data.nextPageToken ?? null,

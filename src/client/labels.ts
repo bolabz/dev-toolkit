@@ -6,6 +6,7 @@
 
 import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase } from './base.js';
+import { GmailLabelSchema, GmailLabelListSchema, validateResponse } from './schemas.js';
 
 /** Options for creating a new Gmail label. */
 export interface CreateLabelOptions {
@@ -49,6 +50,7 @@ export class LabelsClient extends GmailClientBase implements ILabelsClient {
       () => this.gmail.users.labels.list({ userId: this.userId }),
       'labels.list',
     );
+    validateResponse(GmailLabelListSchema, response.data, 'labels.list');
     return response.data.labels ?? [];
   }
 
@@ -62,6 +64,7 @@ export class LabelsClient extends GmailClientBase implements ILabelsClient {
       () => this.gmail.users.labels.get({ userId: this.userId, id }),
       'labels.get',
     );
+    validateResponse(GmailLabelSchema, response.data, 'labels.get');
     return response.data;
   }
 
@@ -72,7 +75,11 @@ export class LabelsClient extends GmailClientBase implements ILabelsClient {
    */
   async batchGet(ids: string[]): Promise<gmail_v1.Schema$Label[]> {
     const fns = ids.map(
-      (id) => () => this.gmail.users.labels.get({ userId: this.userId, id }).then((r) => r.data),
+      (id) => () =>
+        this.gmail.users.labels.get({ userId: this.userId, id }).then((r) => {
+          validateResponse(GmailLabelSchema, r.data, 'labels.batchGet');
+          return r.data;
+        }),
     );
     const { results } = await this.batchExecute(fns, 'labels.batchGet');
     return results;

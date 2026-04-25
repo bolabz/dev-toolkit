@@ -6,6 +6,7 @@
 
 import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase, type MessageFormat } from './base.js';
+import { GmailMessageSchema, GmailMessageListSchema, validateResponse } from './schemas.js';
 
 /** Options for listing Gmail messages (single page or auto-paginated). */
 export interface ListMessagesOptions {
@@ -93,6 +94,7 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
           }),
         'messages.list',
       );
+      validateResponse(GmailMessageListSchema, response.data, 'messages.list');
       if (resultSizeEstimate === 0) {
         resultSizeEstimate = response.data.resultSizeEstimate ?? 0;
       }
@@ -136,6 +138,7 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
         }),
       'messages.get',
     );
+    validateResponse(GmailMessageSchema, response.data, 'messages.get');
     return response.data;
   }
 
@@ -160,7 +163,10 @@ export class MessagesClient extends GmailClientBase implements IMessagesClient {
             format,
             metadataHeaders,
           })
-          .then((r) => r.data),
+          .then((r) => {
+            validateResponse(GmailMessageSchema, r.data, 'messages.batchGet');
+            return r.data;
+          }),
     );
     const { results } = await this.batchExecute(fns, 'messages.batchGet');
     return results;

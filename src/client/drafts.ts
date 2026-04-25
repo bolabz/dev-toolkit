@@ -6,6 +6,7 @@
 
 import type { gmail_v1 } from 'googleapis';
 import { GmailClientBase, type MessageFormat } from './base.js';
+import { GmailDraftSchema, GmailDraftListSchema, validateResponse } from './schemas.js';
 
 /** Options for listing Gmail drafts (single page or auto-paginated). */
 export interface ListDraftsOptions {
@@ -67,6 +68,7 @@ export class DraftsClient extends GmailClientBase implements IDraftsClient {
           }),
         'drafts.list',
       );
+      validateResponse(GmailDraftListSchema, response.data, 'drafts.list');
       if (resultSizeEstimate === 0) {
         resultSizeEstimate = response.data.resultSizeEstimate ?? 0;
       }
@@ -99,6 +101,7 @@ export class DraftsClient extends GmailClientBase implements IDraftsClient {
       () => this.gmail.users.drafts.get({ userId: this.userId, id, format }),
       'drafts.get',
     );
+    validateResponse(GmailDraftSchema, response.data, 'drafts.get');
     return response.data;
   }
 
@@ -114,7 +117,10 @@ export class DraftsClient extends GmailClientBase implements IDraftsClient {
   ): Promise<gmail_v1.Schema$Draft[]> {
     const fns = ids.map(
       (id) => () =>
-        this.gmail.users.drafts.get({ userId: this.userId, id, format }).then((r) => r.data),
+        this.gmail.users.drafts.get({ userId: this.userId, id, format }).then((r) => {
+          validateResponse(GmailDraftSchema, r.data, 'drafts.batchGet');
+          return r.data;
+        }),
     );
     const { results } = await this.batchExecute(fns, 'drafts.batchGet');
     return results;
