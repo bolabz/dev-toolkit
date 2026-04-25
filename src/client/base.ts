@@ -55,18 +55,26 @@ function isWriteOp(operation: string): boolean {
 }
 
 /**
- * Returns a promise that rejects after `ms` milliseconds with a GmailApiError.
- * Used in Promise.race to enforce per-request timeouts.
+ * Race a promise against a timeout, clearing the timer on resolution.
  *
- * The resulting error has `retryable: false` (code 0, not a network error)
+ * Previous implementation (`rejectAfterTimeout`) left a dangling `setTimeout`
+ * on every successful API call — when it eventually fired, it rejected an
+ * unobserved promise, causing silent `unhandledRejection` events.
+ * The `.finally()` ensures the timer is always cleaned up.
+ *
+ * The timeout error has `retryable: false` (code 0, not a network error)
  * because the server may have already completed the operation.
+ * @param promise - The async operation to race against the timeout
  * @param ms - Timeout duration in milliseconds
  * @param operation - The operation label for error context
- * @returns A promise that always rejects after the timeout
+ * @returns The resolved result, or rejects with a timeout GmailApiError
  */
-function rejectAfterTimeout(ms: number, operation: string): Promise<never> {
-  return new Promise<never>((_, reject) => {
-    setTimeout(() => {
+function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
+  // The Promise constructor runs synchronously, so timer is assigned before
+  // .finally() can fire. Typed as | undefined to avoid non-null assertion.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
       reject(
         new GmailApiError(
           operation,
@@ -77,6 +85,9 @@ function rejectAfterTimeout(ms: number, operation: string): Promise<never> {
         ),
       );
     }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer != null) clearTimeout(timer);
   });
 }
 
@@ -262,7 +273,7 @@ export abstract class GmailClientBase {
       try {
         await this.quotaBucket.acquire(cost);
         const timeoutMs = isWriteOp(operation) ? WRITE_TIMEOUT_MS : READ_TIMEOUT_MS;
-        return await Promise.race([this.queue.add(fn), rejectAfterTimeout(timeoutMs, operation)]);
+        return await withTimeout(this.queue.add(fn), timeoutMs, operation);
       } catch (err) {
         if (err instanceof GmailValidationError) throw err;
         const apiErr = err instanceof GmailApiError ? err : new GmailApiError(operation, err);
