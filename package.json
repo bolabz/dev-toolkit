@@ -15,8 +15,7 @@
     "dist/",
     "docs/architecture.mermaid",
     "docs/gmail-toolkit.api.md",
-    "README.md",
-    "CHANGELOG.md"
+    "README.md"
   ],
   "bin": {
     "gmail-toolkit": "dist/mcp/server.js"
@@ -41,6 +40,7 @@
     "fix": "npm run knip:fix && npm run lint:fix && npm run prettier:fix",
     "check": "npm run fix && npm run typecheck && npm run format:check && npm run docs:check && npm run deps:check && npm run knip:check",
     "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test": "npm run check && npm run test:unit",

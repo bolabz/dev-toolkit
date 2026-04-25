@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
-import { Logger } from '../src/infra/logger.js';
+import { Logger } from '../../../src/infra/logger.js';
 
 describe('Logger', () => {
   let errorSpy: MockInstance;
