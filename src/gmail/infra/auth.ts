@@ -9,6 +9,7 @@
  */
 
 import { OAuth2Client } from 'google-auth-library';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
@@ -180,14 +181,16 @@ export function beginAuthFlow(
   const oauth2 = createOAuth2Client(resolvedCredPath);
   const resolvedTokenPath = path.resolve(tokenPath);
 
+  const expectedState = crypto.randomBytes(32).toString('hex');
   const url = oauth2.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     prompt: 'consent',
+    state: expectedState,
   });
 
   const completed = (async () => {
-    const code = await waitForRedirect();
+    const code = await waitForRedirect(expectedState);
     const { tokens } = await oauth2.getToken(code);
     oauth2.setCredentials(tokens);
 
@@ -195,7 +198,7 @@ export function beginAuthFlow(
     if (!fs.existsSync(tokenDir)) {
       fs.mkdirSync(tokenDir, { recursive: true });
     }
-    fs.writeFileSync(resolvedTokenPath, JSON.stringify(tokens, null, 2));
+    writeTokenFile(resolvedTokenPath, tokens);
     log.info('Authentication successful. Token saved.');
   })();
 
@@ -218,10 +221,12 @@ function createOAuth2Client(credentialsPath: string): OAuth2Client {
 // ---------------------------------------------------------------------------
 
 async function browserAuthFlow(oauth2: OAuth2Client, tokenPath: string): Promise<OAuth2Client> {
+  const expectedState = crypto.randomBytes(32).toString('hex');
   const authUrl = oauth2.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     prompt: 'consent', // ensures we always get a refresh token
+    state: expectedState,
   });
 
   log.info('Authentication required. Opening browser for Google sign-in...');
@@ -230,8 +235,8 @@ async function browserAuthFlow(oauth2: OAuth2Client, tokenPath: string): Promise
   // Open browser (cross-platform via 'open' package)
   await open(authUrl);
 
-  // Wait for OAuth redirect on localhost
-  const code = await waitForRedirect();
+  // Wait for OAuth redirect on localhost (validates state to prevent CSRF)
+  const code = await waitForRedirect(expectedState);
 
   // Exchange code for tokens
   const { tokens } = await oauth2.getToken(code);
@@ -242,10 +247,25 @@ async function browserAuthFlow(oauth2: OAuth2Client, tokenPath: string): Promise
   if (!fs.existsSync(tokenDir)) {
     fs.mkdirSync(tokenDir, { recursive: true });
   }
-  fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
+  writeTokenFile(tokenPath, tokens);
   log.info('Authentication successful. Token saved.');
 
   return oauth2;
+}
+
+/**
+ * Persist the OAuth token JSON with restrictive (0600) file permissions.
+ *
+ * The token contains a long-lived refresh token that grants full Gmail access.
+ * Setting both the create-mode and an explicit chmod handles the case where
+ * the file already exists (writeFileSync's `mode` option only applies on
+ * creation), guaranteeing other local users on the machine cannot read it.
+ * @param tokenPath - Absolute filesystem path where the token JSON is written
+ * @param tokens - OAuth token payload (access/refresh tokens) to serialize
+ */
+function writeTokenFile(tokenPath: string, tokens: unknown): void {
+  fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
+  fs.chmodSync(tokenPath, 0o600);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,18 +273,33 @@ async function browserAuthFlow(oauth2: OAuth2Client, tokenPath: string): Promise
 // ---------------------------------------------------------------------------
 
 /**
- * Starts a temporary HTTP server on localhost to capture the OAuth redirect.
- * Automatically shuts down after receiving the authorization code or timing out.
+ * Starts a temporary HTTP server on the loopback interface to capture the
+ * OAuth redirect. The server is bound to 127.0.0.1 so it cannot be reached
+ * from other devices on the local network, and the redirect's `state`
+ * parameter is validated against `expectedState` (constant-time comparison)
+ * to prevent CSRF and code-injection from a phished link.
+ *
+ * The server automatically shuts down after a successful capture or timeout.
+ * @param expectedState - Random state value generated when the auth URL was created
  * @returns The authorization code from the OAuth redirect
  */
-function waitForRedirect(): Promise<string> {
+function waitForRedirect(expectedState: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
-      const url = new URL(req.url ?? '/', `http://localhost:${REDIRECT_PORT}`);
+      const url = new URL(req.url ?? '/', `http://127.0.0.1:${REDIRECT_PORT}`);
 
       if (url.pathname !== '/oauth2callback') {
         res.writeHead(404);
         res.end('Not found');
+        return;
+      }
+
+      const receivedState = url.searchParams.get('state') ?? '';
+      if (!safeEqual(receivedState, expectedState)) {
+        res.writeHead(400, { 'Content-Type': 'text/html' });
+        res.end(authResultPage(false, 'OAuth state mismatch — request rejected for your safety.'));
+        cleanup();
+        reject(new Error('OAuth state mismatch — possible CSRF, request rejected'));
         return;
       }
 
@@ -309,7 +344,9 @@ function waitForRedirect(): Promise<string> {
       server.close();
     }
 
-    server.listen(REDIRECT_PORT, () => {
+    // Bind to loopback only — never listen on 0.0.0.0/:: so other devices on
+    // the LAN cannot race the OAuth callback with an injected code.
+    server.listen(REDIRECT_PORT, '127.0.0.1', () => {
       // Server ready — browser should redirect here
     });
 
@@ -325,6 +362,21 @@ function waitForRedirect(): Promise<string> {
       }
     });
   });
+}
+
+/**
+ * Constant-time string comparison to prevent timing-based state oracle attacks.
+ * Falls back to false on length mismatch (Buffer.from + timingSafeEqual requires
+ * equal-length buffers).
+ * @param a - First string to compare
+ * @param b - Second string to compare
+ * @returns True iff the strings are byte-for-byte equal
+ */
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf-8');
+  const bufB = Buffer.from(b, 'utf-8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 // ---------------------------------------------------------------------------
