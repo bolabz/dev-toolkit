@@ -10,8 +10,10 @@
  * happens seamlessly on first use in any mode.
  */
 
-import { ensureAuthenticated } from '../src/index.js';
+import { gmail } from '../src/index.js';
 import { logger } from '../src/gmail/infra/logger.js';
+
+const { ensureAuthenticated } = gmail;
 
 const log = logger.child('setup');
 

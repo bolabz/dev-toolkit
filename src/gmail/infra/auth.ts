@@ -57,11 +57,13 @@ interface InstalledCredentials {
 // Options
 // ---------------------------------------------------------------------------
 
-/** Options for {@link ensureAuthenticated}. */
+/**
+ * Options for `ensureAuthenticated`.
+ */
 export interface AuthOptions {
   /**
    * Allow interactive browser-based OAuth consent flow.
-   * When `false` (default), throws {@link AuthenticationRequiredError} if no valid
+   * When `false` (default), throws `AuthenticationRequiredError` if no valid
    * token is available. When `true`, opens a browser for Google sign-in.
    *
    * Only `setup-auth` should set this to `true`.
@@ -74,7 +76,7 @@ export interface AuthOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Result of {@link beginAuthFlow} — provides the OAuth URL for the user and
+ * Result of `beginAuthFlow` — provides the OAuth URL for the user and
  * a promise that resolves when the user completes browser consent.
  */
 export interface PendingAuth {
@@ -347,7 +349,9 @@ function authResultPage(success: boolean, message: string): string {
 // Auth Errors
 // ---------------------------------------------------------------------------
 
-/** Thrown when credentials.json is not found at the expected path. */
+/**
+ * Thrown when credentials.json is not found at the expected path.
+ */
 export class MissingCredentialsError extends Error {
   /**
    * Create a MissingCredentialsError with setup instructions.
@@ -385,7 +389,9 @@ export class MissingCredentialsError extends Error {
   }
 }
 
-/** Thrown when a valid OAuth token is required but not available (missing or expired). */
+/**
+ * Thrown when a valid OAuth token is required but not available (missing or expired).
+ */
 export class AuthenticationRequiredError extends Error {
   /**
    * Create an AuthenticationRequiredError with setup instructions.
