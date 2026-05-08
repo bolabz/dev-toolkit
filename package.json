@@ -47,11 +47,12 @@
     "deps:diagram:mermaid": "depcruise src --config .dependency-cruiser.cjs --output-type mermaid --output-to docs/architecture.mermaid",
     "deps:diagram:svg": "mmdc -i docs/architecture.mermaid -o docs/architecture.svg",
     "deps:diagram:update": "npm run deps:diagram:mermaid && npm run deps:diagram:svg",
+    "docs:fresh": "npm run deps:diagram:update && git diff --exit-code HEAD -- docs/architecture.mermaid docs/architecture.svg",
     "docs": "npm run docs:update && npm run api:update && npm run deps:diagram:update",
-    "clean": "rm -rf dist logs docs/typedoc docs/architecture.mermaid docs/architecture.svg docs/dev-toolkit.api.md",
+    "clean": "rm -rf dist logs docs/typedoc",
     "compile": "tsc -p tsconfig.build.json",
     "build": "npm run clean && npm run compile",
-    "ci": "npm run test && npm run build"
+    "ci": "npm run docs:fresh && npm run test && npm run build"
   },
   "keywords": [
     "gmail",

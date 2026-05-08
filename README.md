@@ -23,7 +23,9 @@ Each module follows the same four-layer shape:
 - **L2 — API** (`src/<module>/api/`): aggregated operations, caching, body processing, analytics
 - **L3 — MCP** (`src/<module>/mcp/`): tool modules, resources, and prompts for LLM consumption
 
-Layer boundaries are enforced by `dependency-cruiser` ([config](.dependency-cruiser.cjs)) — see [docs/architecture.mermaid](docs/architecture.mermaid) for the live diagram and [docs/dev-toolkit.api.md](docs/dev-toolkit.api.md) for the public API report.
+Layer boundaries are enforced by `dependency-cruiser` ([config](.dependency-cruiser.cjs)). The diagram below is auto-generated from the actual import graph and re-checked on every push — it cannot drift from the code. See [docs/dev-toolkit.api.md](docs/dev-toolkit.api.md) for the public API report.
+
+<img src="docs/architecture.svg" width="800" alt="Dev Toolkit architecture (auto-generated from dependency-cruiser)">
 
 ---
 

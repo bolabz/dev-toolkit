@@ -28,7 +28,6 @@ Thumbs.db
 
 # Generated docs
 docs/typedoc/
-docs/architecture.svg
 
 # Test coverage
 coverage/
