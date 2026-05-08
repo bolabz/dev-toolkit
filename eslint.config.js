@@ -152,10 +152,16 @@ export default tseslint.config(
       'jsdoc/require-property-type': 'off',
 
       // --- Tag validation ---
+      // `typed: false` because TSDoc release tags (@public, @beta, @alpha) are
+      // semantically distinct from TypeScript's `public` access modifier — the
+      // former mark API stability for API Extractor, the latter is a class-member
+      // visibility keyword. The plugin's `typed: true` mode conflates them and
+      // strips @public on --fix. We rely on `jsdoc/no-types: 'error'` (above) to
+      // forbid @type tags, which is the main thing `typed: true` was catching.
       'jsdoc/check-tag-names': [
         'error',
         {
-          typed: true,
+          typed: false,
           definedTags: [
             'remarks',
             'typeParam',

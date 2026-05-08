@@ -59,6 +59,7 @@ interface InstalledCredentials {
 
 /**
  * Options for `ensureAuthenticated`.
+ * @public
  */
 export interface AuthOptions {
   /**
@@ -78,6 +79,7 @@ export interface AuthOptions {
 /**
  * Result of `beginAuthFlow` — provides the OAuth URL for the user and
  * a promise that resolves when the user completes browser consent.
+ * @public
  */
 export interface PendingAuth {
   /** Google OAuth consent URL for the user to visit. */
@@ -102,6 +104,7 @@ export interface PendingAuth {
  * @param tokenPath - Path to stored token.json (default: GMAIL_TOKEN_PATH env var or ./token.json)
  * @param options - Authentication options (interactive mode, etc.)
  * @returns Authenticated OAuth2Client ready for Gmail API calls
+ * @public
  */
 export async function ensureAuthenticated(
   credentialsPath: string = DEFAULT_CREDENTIALS_PATH,
@@ -163,6 +166,7 @@ export async function ensureAuthenticated(
  * @param credentialsPath - Path to Google OAuth credentials.json (default: GMAIL_CREDENTIALS_PATH env var or ./credentials.json)
  * @param tokenPath - Path where the OAuth token will be stored (default: GMAIL_TOKEN_PATH env var or ./token.json)
  * @returns The OAuth URL and a completion promise
+ * @public
  */
 export function beginAuthFlow(
   credentialsPath: string = DEFAULT_CREDENTIALS_PATH,
@@ -351,6 +355,7 @@ function authResultPage(success: boolean, message: string): string {
 
 /**
  * Thrown when credentials.json is not found at the expected path.
+ * @public
  */
 export class MissingCredentialsError extends Error {
   /**
@@ -391,6 +396,7 @@ export class MissingCredentialsError extends Error {
 
 /**
  * Thrown when a valid OAuth token is required but not available (missing or expired).
+ * @public
  */
 export class AuthenticationRequiredError extends Error {
   /**
