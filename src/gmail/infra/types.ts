@@ -20,6 +20,7 @@ export const ContactSchema = z.object({
 });
 /**
  * A named email contact with an optional display name and a required address.
+ * @public
  */
 export type Contact = z.infer<typeof ContactSchema>;
 
@@ -32,6 +33,7 @@ export const AttachmentInfoSchema = z.object({
 });
 /**
  * Metadata for a single email attachment (does not include the binary payload).
+ * @public
  */
 export type AttachmentInfo = z.infer<typeof AttachmentInfoSchema>;
 
@@ -47,6 +49,7 @@ export const DateRangeSchema = z.object({
 });
 /**
  * Thread date range: first-message date, and last-message date when the thread has multiple messages.
+ * @public
  */
 export type DateRange = z.infer<typeof DateRangeSchema>;
 
@@ -81,6 +84,7 @@ export const MessageSummarySchema = z.object({
 });
 /**
  * Compact message summary for list/search responses.
+ * @public
  */
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
 
@@ -95,6 +99,7 @@ export const MatchedMessageSummarySchema = MessageSummarySchema.omit({
 });
 /**
  * Message summary nested within a ThreadMatch — omits subject/thread_id (carried on thread).
+ * @public
  */
 export type MatchedMessageSummary = z.infer<typeof MatchedMessageSummarySchema>;
 
@@ -134,6 +139,7 @@ export const SearchSummarySchema = z.object({
 });
 /**
  * Aggregated analytics over a search result (unread counts, senders, labels, thread depth).
+ * @public
  */
 export type SearchSummary = z.infer<typeof SearchSummarySchema>;
 
@@ -148,6 +154,7 @@ export const SearchResultSchema = z.object({
 });
 /**
  * Complete paginated search result: message rows, paging token, and summary analytics.
+ * @public
  */
 export type SearchResult = z.infer<typeof SearchResultSchema>;
 
@@ -183,6 +190,7 @@ export const FullMessageSchema = z.object({
 });
 /**
  * Fully resolved message with parsed contacts, labels, body text, and attachment metadata.
+ * @public
  */
 export type FullMessage = z.infer<typeof FullMessageSchema>;
 
@@ -211,6 +219,7 @@ export const FullThreadSchema = z.object({
 });
 /**
  * Complete thread with all messages, participants, and date range.
+ * @public
  */
 export type FullThread = z.infer<typeof FullThreadSchema>;
 
@@ -238,6 +247,7 @@ export const LabelDetailSchema = z.object({
 });
 /**
  * Complete label definition including message/thread counts, color, and visibility settings.
+ * @public
  */
 export type LabelDetail = z.infer<typeof LabelDetailSchema>;
 
@@ -254,6 +264,7 @@ export const LabelOverviewSchema = z.object({
 });
 /**
  * All labels grouped by type (system, user) with counts and summaries.
+ * @public
  */
 export type LabelOverview = z.infer<typeof LabelOverviewSchema>;
 
@@ -277,6 +288,7 @@ export const DraftDetailSchema = z.object({
 });
 /**
  * Metadata for a single draft message including headers, snippet, and optional processed body.
+ * @public
  */
 export type DraftDetail = z.infer<typeof DraftDetailSchema>;
 
@@ -287,6 +299,7 @@ export const DraftSummarySchema = z.object({
 });
 /**
  * Collection of all drafts with total count and per-draft metadata.
+ * @public
  */
 export type DraftSummary = z.infer<typeof DraftSummarySchema>;
 
@@ -309,6 +322,7 @@ export const FilterCriteriaSchema = z.object({
  * Criteria that determine which incoming messages a Gmail filter matches
  * (sender, recipient, subject, query, size, attachment presence, etc.).
  * Only set fields are present — unused criteria are omitted rather than null.
+ * @public
  */
 export type FilterCriteria = z.infer<typeof FilterCriteriaSchema>;
 
@@ -325,6 +339,7 @@ export const FilterCriteriaInputSchema = z.object({
 });
 /**
  * Input criteria for searching, filtering, or modifying messages by structured fields.
+ * @public
  */
 export type FilterCriteriaInput = z.infer<typeof FilterCriteriaInputSchema>;
 
@@ -342,6 +357,7 @@ export const SearchCriteriaInputSchema = FilterCriteriaInputSchema.extend({
 });
 /**
  * Search criteria extending filter criteria with date ranges, label filters, and status.
+ * @public
  */
 export type SearchCriteriaInput = z.infer<typeof SearchCriteriaInputSchema>;
 
@@ -356,6 +372,7 @@ export const FilterActionsSchema = z.object({
 /**
  * Actions applied to a message when a Gmail filter matches:
  * label mutations, forwarding address, skip-inbox, and mark-as-read.
+ * @public
  */
 export type FilterActions = z.infer<typeof FilterActionsSchema>;
 
@@ -367,6 +384,7 @@ export const FilterDetailSchema = z.object({
 });
 /**
  * Complete Gmail filter definition pairing a filter ID with its criteria and actions.
+ * @public
  */
 export type FilterDetail = z.infer<typeof FilterDetailSchema>;
 
@@ -377,6 +395,7 @@ export const FilterOverviewSchema = z.object({
 });
 /**
  * All Gmail filters with a total count and per-filter details.
+ * @public
  */
 export type FilterOverview = z.infer<typeof FilterOverviewSchema>;
 
@@ -429,6 +448,7 @@ export const AccountOverviewSchema = z.object({
 /**
  * Gmail account overview: profile counters, vacation responder, forwarding,
  * send-as aliases, delegates, and IMAP/POP status.
+ * @public
  */
 export type AccountOverview = z.infer<typeof AccountOverviewSchema>;
 
@@ -440,6 +460,7 @@ export const AccountContextSchema = AccountOverviewSchema.extend({
 /**
  * Full account context: profile + settings + all labels + all filters.
  * Returned by the unified `gmail_account` MCP tool for one-call orientation.
+ * @public
  */
 export type AccountContext = z.infer<typeof AccountContextSchema>;
 
@@ -455,6 +476,7 @@ export const ModifyResultSchema = z.object({
 });
 /**
  * Result of a batch label-modification: count of modified messages and any failure IDs.
+ * @public
  */
 export type ModifyResult = z.infer<typeof ModifyResultSchema>;
 
@@ -465,6 +487,7 @@ export const DeleteResultSchema = z.object({
 });
 /**
  * Result of a single message delete or trash operation with a human-readable summary.
+ * @public
  */
 export type DeleteResult = z.infer<typeof DeleteResultSchema>;
 
@@ -480,6 +503,7 @@ export const DeleteLabelResultSchema = z.object({
 /**
  * Result of deleting a user label: confirmation flag, label details, and counts of
  * messages and threads that had the label removed.
+ * @public
  */
 export type DeleteLabelResult = z.infer<typeof DeleteLabelResultSchema>;
 
@@ -492,6 +516,7 @@ export const DeleteFilterResultSchema = z.object({
 });
 /**
  * Result of deleting a filter rule, including the resolved criteria summary.
+ * @public
  */
 export type DeleteFilterResult = z.infer<typeof DeleteFilterResultSchema>;
 
@@ -503,6 +528,7 @@ export const SendResultSchema = z.object({
 });
 /**
  * Result of sending a message or draft (returns the sent message ID + thread ID).
+ * @public
  */
 export type SendResult = z.infer<typeof SendResultSchema>;
 
@@ -556,6 +582,7 @@ export const ComposeModeSchema = z.discriminatedUnion('mode', [
 ]);
 /**
  * Discriminated union: draft | update_draft | send | send_draft.
+ * @public
  */
 export type ComposeMode = z.infer<typeof ComposeModeSchema>;
 
@@ -577,6 +604,7 @@ export const ThreadSummarySchema = z.object({
 });
 /**
  * Lightweight thread row from a search — use readThread() for full details. Enrichment fields present when enrich=true.
+ * @public
  */
 export type ThreadSummary = z.infer<typeof ThreadSummarySchema>;
 
@@ -589,6 +617,7 @@ export const ThreadSearchResultSchema = z.object({
 });
 /**
  * Paginated thread search result with lightweight thread rows and paging metadata.
+ * @public
  */
 export type ThreadSearchResult = z.infer<typeof ThreadSearchResultSchema>;
 
@@ -605,6 +634,7 @@ export const HistoryEventSchema = z.object({
 });
 /**
  * A single mailbox change event: what happened, to which message, and which labels changed.
+ * @public
  */
 export type HistoryEvent = z.infer<typeof HistoryEventSchema>;
 
@@ -615,6 +645,7 @@ export const HistoryResultSchema = z.object({
 });
 /**
  * Incremental sync result: all change events since the requested history ID and the new watermark.
+ * @public
  */
 export type HistoryResult = z.infer<typeof HistoryResultSchema>;
 
@@ -635,6 +666,7 @@ export const ThreadMatchSchema = z.object({
 });
 /**
  * A thread with its matched messages from an aggregated search.
+ * @public
  */
 export type ThreadMatch = z.infer<typeof ThreadMatchSchema>;
 
@@ -647,6 +679,7 @@ export const SearchAllResultSchema = z.object({
 });
 /**
  * Complete aggregated search result: messages grouped by thread with analytics.
+ * @public
  */
 export type SearchAllResult = z.infer<typeof SearchAllResultSchema>;
 
@@ -671,6 +704,7 @@ export const ReadThreadSchema = z.object({
 });
 /**
  * A thread with context emitted once and messages nested underneath.
+ * @public
  */
 export type ReadThread = z.infer<typeof ReadThreadSchema>;
 
@@ -678,6 +712,7 @@ export type ReadThread = z.infer<typeof ReadThreadSchema>;
 export const ReadResultSchema = z.array(ReadThreadSchema);
 /**
  * Array of threads, each with context emitted once and messages nested.
+ * @public
  */
 export type ReadResult = z.infer<typeof ReadResultSchema>;
 
@@ -703,5 +738,6 @@ export const GmailToolkitErrorSchema = z.object({
 /**
  * Serialised error DTO returned inside MCP tool results when an operation fails.
  * Carries HTTP status code, message, operation label, retryability flag, and optional field name.
+ * @public
  */
 export type GmailToolkitError = z.infer<typeof GmailToolkitErrorSchema>;

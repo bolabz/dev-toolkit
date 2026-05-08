@@ -46,6 +46,7 @@ export function buildOps(ctx: GmailContext) {
 
 /**
  * Flat API facade: all Gmail api operations as a single object.
+ * @public
  */
 export type GmailToolkit = ReturnType<typeof buildOps>;
 
@@ -61,6 +62,7 @@ export type GmailToolkit = ReturnType<typeof buildOps>;
  *   - No token or revoked: throws AuthenticationRequiredError
  *   - No credentials.json: throws MissingCredentialsError
  * @returns An authenticated GmailToolkit ready for use
+ * @public
  */
 export async function createGmailToolkit(): Promise<GmailToolkit> {
   const ctx = await createGmailContext();
