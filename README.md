@@ -2,7 +2,7 @@
 
 A multi-module TypeScript developer toolkit for third-party SDK integrations with MCP (Model Context Protocol) server exposure. Each module ships as both a library namespace and an installable MCP server, so the same code powers both programmatic use and LLM-driven workflows.
 
-**Status:** Gmail is the first module. Calendar, Drive, and other Google API surfaces are planned to follow the same module shape.
+**Status:** Gmail is the first module. The module structure is built so additional Google API integrations can follow the same shape.
 
 ---
 
@@ -40,7 +40,15 @@ Auth resolves from `GMAIL_CREDENTIALS_PATH` and `GMAIL_TOKEN_PATH` env vars or `
 
 ## MCP server usage
 
-Add the Gmail MCP server to your `claude_desktop_config.json`:
+First, build and install the `gmail-mcp` binary onto your PATH (until the package is published to npm):
+
+```bash
+npm install
+npm run build
+npm install -g .   # registers the gmail-mcp binary globally
+```
+
+Then add the Gmail MCP server to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -56,7 +64,9 @@ Add the Gmail MCP server to your `claude_desktop_config.json`:
 }
 ```
 
-The Gmail MCP server exposes 14 tools (7 read + 7 write/destructive, with destructive tools disabled by default), 2 resources (`gmail://labels`, `gmail://profile`), and 5 prompts. Tool enablement is configurable via `GMAIL_ENABLE_TOOLS` and `GMAIL_DISABLE_TOOLS` env vars.
+If you'd rather skip the global install, swap the `command` for an absolute node invocation: `"command": "node", "args": ["/absolute/path/to/dev-toolkit/dist/gmail/mcp/server.js"]`.
+
+The Gmail MCP server exposes 14 tools (4 read + 7 write + 3 destructive, with destructive disabled by default), 3 resources (`gmail://labels`, `gmail://filters`, `gmail://profile`), and 5 prompts. Tool enablement is configurable via `GMAIL_ENABLE_TOOLS` and `GMAIL_DISABLE_TOOLS` env vars.
 
 ---
 

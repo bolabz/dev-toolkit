@@ -15,7 +15,7 @@
 - `LabelCache` in `src/gmail/api/label-cache.ts` is central across composed operations; invalidate it after label mutations (`createLabel`, `updateLabel`, delete paths).
 - Layer 1 clients share one `PQueue` limiter via `GmailClient` (`src/gmail/client/index.ts`) with config in `src/gmail/client/base.ts`.
 - MCP layer architecture: `src/gmail/mcp/base.ts` is the internal hub — all tool modules (`tools-*.ts`, `resources.ts`) and `server.ts` import from it, giving Layer 3 a single unified internal dependency (mirrors `src/gmail/api/context.ts` role for Layer 2). Domain-specific handlers in `src/gmail/mcp/tools-*.ts` map Zod inputs to Layer 2 calls and JSON-stringify outputs.
-- MCP server also exposes 2 **resources** (`gmail://labels`, `gmail://profile`) in `src/gmail/mcp/resources.ts` and 5 **prompts** in `src/gmail/mcp/prompts.ts`.
+- MCP server also exposes 3 **resources** (`gmail://labels`, `gmail://filters`, `gmail://profile`) in `src/gmail/mcp/resources.ts` and 5 **prompts** in `src/gmail/mcp/prompts.ts`.
 - Error flow: Layer 1 wraps all API failures in `GmailApiError` (carries HTTP code + `retryable` flag); Layer 2 throws `GmailValidationError` for bad caller input; Layer 3 catches both and serialises via `toMcpResult()` in `src/gmail/mcp/utils.ts` into `GmailToolkitError` DTO.
 
 ## Layer Dependency Rules (within a module)
@@ -32,8 +32,8 @@
 - Keep stdout clean for MCP protocol: use `logger` from `src/gmail/infra/logger.ts` (stderr-only). Do not add `console.log`. The logger is the only file allowed to use `console.error` (override in `eslint.config.js`).
 - Preserve the layer boundary: put Gmail API call mechanics in `src/gmail/client/*`, orchestration/aggregation in `src/gmail/api/*`, transport wiring in `src/gmail/mcp/`. Layer boundaries are enforced by dependency-cruiser (`.dependency-cruiser.cjs`). Run `npm run deps:check` to validate. The tool catches both direct and transitive violations, including type-only imports.
 - `src/gmail/infra/types.ts` uses Zod schemas as canonical contracts (types + runtime validation shape); keep response field naming consistent (snake_case in public outputs).
-- MCP tool enablement is config-driven via `DEFAULT_TOOL_REGISTRY` in `src/gmail/mcp/tool-registry.ts` plus env overrides (`GMAIL_ENABLE_TOOLS`, `GMAIL_DISABLE_TOOLS`). The registry has 20 tools total: 15 enabled by default (7 read + 8 write), 5 destructive disabled.
-- Destructive tools (`gmail_send_*`, `gmail_trash_*`, `gmail_delete_draft`) are disabled by default; keep this safety posture unless explicitly requested. `gmail_delete_label` and `gmail_delete_filter` are in the `write` category and **are** enabled by default.
+- MCP tool enablement is config-driven via `DEFAULT_TOOL_REGISTRY` in `src/gmail/mcp/tool-registry.ts` plus env overrides (`GMAIL_ENABLE_TOOLS`, `GMAIL_DISABLE_TOOLS`). The registry has 14 tools total: 11 enabled by default (4 read + 7 write), 3 destructive disabled.
+- Destructive tools (`gmail_compose`, `gmail_trash`, `gmail_delete_draft`) are disabled by default; keep this safety posture unless explicitly requested. `gmail_delete_label` and `gmail_delete_filter` are in the `write` category and **are** enabled by default.
 - Error classes live in `src/gmail/infra/errors.ts`: throw `GmailApiError` at Layer 1 boundaries, `GmailValidationError` at Layer 2 for bad caller input. Never throw raw errors across layer boundaries.
 - Internal helpers (`parseContact`, `headerMap`, `transformMessage`, `buildRfc2822Message`, etc.) live in `src/gmail/api/helpers.ts` and are imported directly — they are NOT re-exported from the api barrel. `processBody` in `body-processing.ts` is marked `@internal` (not yet wired up).
 - Barrel exports (`index.ts` files) export only the public surface of each layer. Do not re-export internal utilities through barrels.
