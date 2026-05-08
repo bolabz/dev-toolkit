@@ -11,9 +11,9 @@
 
 import fs from 'node:fs';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import type { GmailToolkit } from '../../../src/api/index.js';
-import type { GmailContext } from '../../../src/api/context.js';
-import { createGmailContext } from '../../../src/api/context.js';
+import type { GmailToolkit } from '../../../../src/gmail/api/index.js';
+import type { GmailContext } from '../../../../src/gmail/api/context.js';
+import { createGmailContext } from '../../../../src/gmail/api/context.js';
 
 const HAS_CREDENTIALS = fs.existsSync('credentials.json') && fs.existsSync('token.json');
 
@@ -23,7 +23,7 @@ describe.skipIf(!HAS_CREDENTIALS)('L2 API — Live Gmail', () => {
 
   beforeAll(async () => {
     ctx = await createGmailContext();
-    const { buildOps } = await import('../../../src/api/index.js');
+    const { buildOps } = await import('../../../../src/gmail/api/index.js');
     toolkit = buildOps(ctx);
   });
 

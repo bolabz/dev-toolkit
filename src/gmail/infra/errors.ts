@@ -46,6 +46,7 @@ const RETRYABLE_HTTP_CODES = new Set([429, 500, 502, 503]);
  * Uses the native ES2022 `Error.cause` (via the options bag passed to `super`)
  * so standard tooling (stack trace formatters, `util.inspect`, Sentry) can
  * automatically chain and display the original error.
+ * @public
  */
 export class GmailApiError extends Error {
   /** HTTP status code returned by the Gmail API (0 if unavailable). */
@@ -78,6 +79,7 @@ export class GmailApiError extends Error {
 /**
  * Thrown by Layer 2 api operations when caller-supplied input is invalid.
  * Examples: label name not found in the account, empty message ID array.
+ * @public
  */
 export class GmailValidationError extends Error {
   /** The Layer 2 operation that rejected the input, e.g. `'modifyMessages'`. */

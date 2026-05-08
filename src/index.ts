@@ -1,57 +1,16 @@
 /**
- * Gmail Toolkit — Library Entry Point
+ * Dev Toolkit — Public Entry Point
  *
- * Usage:
- *   import { createGmailToolkit } from 'gmail-toolkit';
- *   const toolkit = await createGmailToolkit();
- *   const results = await toolkit.search('is:unread from:chase');
+ * Namespaced module access (primary):
+ *   import { gmail } from 'dev-toolkit';
+ *   const toolkit = await gmail.createGmailToolkit();
+ *
+ * Back-compat named import (deprecated, will be removed in next major):
+ *   import { createGmailToolkit } from 'dev-toolkit';
  */
 
-export { createGmailToolkit, type GmailToolkit } from './api/index.js';
+export * as gmail from './gmail/index.js';
 
-export {
-  ensureAuthenticated,
-  beginAuthFlow,
-  MissingCredentialsError,
-  AuthenticationRequiredError,
-  GmailApiError,
-  GmailValidationError,
-  type AuthOptions,
-  type PendingAuth,
-  type Contact,
-  type AttachmentInfo,
-  type DateRange,
-  type SearchResult,
-  type MessageSummary,
-  type MatchedMessageSummary,
-  type SearchSummary,
-  type FullMessage,
-  type FullThread,
-  type LabelDetail,
-  type LabelOverview,
-  type DraftDetail,
-  type DraftSummary,
-  type FilterCriteria,
-  type FilterActions,
-  type FilterDetail,
-  type FilterOverview,
-  type AccountOverview,
-  type AccountContext,
-  type ComposeMode,
-  type SearchCriteriaInput,
-  type ModifyResult,
-  type DeleteResult,
-  type DeleteLabelResult,
-  type DeleteFilterResult,
-  type SendResult,
-  type ThreadSummary,
-  type ThreadSearchResult,
-  type FilterCriteriaInput,
-  type HistoryEvent,
-  type HistoryResult,
-  type GmailToolkitError,
-  type SearchAllResult,
-  type ThreadMatch,
-  type ReadThread,
-  type ReadResult,
-} from './infra/index.js';
+// Back-compat: re-export only the factory function and its return type.
+// All other types are reachable via the gmail namespace.
+export { createGmailToolkit, type GmailToolkit } from './gmail/index.js';

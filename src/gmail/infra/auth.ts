@@ -57,11 +57,14 @@ interface InstalledCredentials {
 // Options
 // ---------------------------------------------------------------------------
 
-/** Options for {@link ensureAuthenticated}. */
+/**
+ * Options for `ensureAuthenticated`.
+ * @public
+ */
 export interface AuthOptions {
   /**
    * Allow interactive browser-based OAuth consent flow.
-   * When `false` (default), throws {@link AuthenticationRequiredError} if no valid
+   * When `false` (default), throws `AuthenticationRequiredError` if no valid
    * token is available. When `true`, opens a browser for Google sign-in.
    *
    * Only `setup-auth` should set this to `true`.
@@ -74,8 +77,9 @@ export interface AuthOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Result of {@link beginAuthFlow} — provides the OAuth URL for the user and
+ * Result of `beginAuthFlow` — provides the OAuth URL for the user and
  * a promise that resolves when the user completes browser consent.
+ * @public
  */
 export interface PendingAuth {
   /** Google OAuth consent URL for the user to visit. */
@@ -100,6 +104,7 @@ export interface PendingAuth {
  * @param tokenPath - Path to stored token.json (default: GMAIL_TOKEN_PATH env var or ./token.json)
  * @param options - Authentication options (interactive mode, etc.)
  * @returns Authenticated OAuth2Client ready for Gmail API calls
+ * @public
  */
 export async function ensureAuthenticated(
   credentialsPath: string = DEFAULT_CREDENTIALS_PATH,
@@ -161,6 +166,7 @@ export async function ensureAuthenticated(
  * @param credentialsPath - Path to Google OAuth credentials.json (default: GMAIL_CREDENTIALS_PATH env var or ./credentials.json)
  * @param tokenPath - Path where the OAuth token will be stored (default: GMAIL_TOKEN_PATH env var or ./token.json)
  * @returns The OAuth URL and a completion promise
+ * @public
  */
 export function beginAuthFlow(
   credentialsPath: string = DEFAULT_CREDENTIALS_PATH,
@@ -347,7 +353,10 @@ function authResultPage(success: boolean, message: string): string {
 // Auth Errors
 // ---------------------------------------------------------------------------
 
-/** Thrown when credentials.json is not found at the expected path. */
+/**
+ * Thrown when credentials.json is not found at the expected path.
+ * @public
+ */
 export class MissingCredentialsError extends Error {
   /**
    * Create a MissingCredentialsError with setup instructions.
@@ -385,7 +394,10 @@ export class MissingCredentialsError extends Error {
   }
 }
 
-/** Thrown when a valid OAuth token is required but not available (missing or expired). */
+/**
+ * Thrown when a valid OAuth token is required but not available (missing or expired).
+ * @public
+ */
 export class AuthenticationRequiredError extends Error {
   /**
    * Create an AuthenticationRequiredError with setup instructions.
