@@ -1,7 +1,7 @@
 #!/usr/bin/env npx tsx
 
 /**
- * Gmail Toolkit — Optional Pre-Auth Script
+ * Dev Toolkit — Optional Pre-Auth Script (Gmail module)
  *
  * Usage: npx tsx scripts/setup-auth.ts [credentials-path] [token-path]
  *
@@ -11,22 +11,22 @@
  */
 
 import { ensureAuthenticated } from '../src/index.js';
-import { logger } from '../src/infra/logger.js';
+import { logger } from '../src/gmail/infra/logger.js';
 
 const log = logger.child('setup');
 
 const credentialsPath = process.argv[2] ?? './credentials.json';
 const tokenPath = process.argv[3] ?? './token.json';
 
-log.debug('Gmail Toolkit — Authentication Setup');
+log.debug('Dev Toolkit — Gmail Authentication Setup');
 log.debug(`Credentials: ${credentialsPath}`);
 log.debug(`Token will be saved to: ${tokenPath}`);
 
 try {
   await ensureAuthenticated(credentialsPath, tokenPath, { interactive: true });
-  log.info('Setup complete! Gmail Toolkit is ready to use.');
+  log.info('Setup complete! Gmail module is ready to use.');
   log.info('Next steps:');
-  log.info('  Library:  import { createGmailToolkit } from "gmail-toolkit"');
+  log.info('  Library:  import { gmail } from "dev-toolkit"');
   log.info('  MCP:      Add to claude_desktop_config.json (see README)');
 } catch (err) {
   if (err instanceof Error) {

@@ -1,7 +1,7 @@
 {
-  "name": "gmail-toolkit",
+  "name": "dev-toolkit",
   "version": "0.2.0",
-  "description": "Three-layer TypeScript toolkit for comprehensive Gmail management — standalone library and MCP server",
+  "description": "TypeScript developer toolkit for third-party SDK integrations with MCP server exposure — Gmail is the first module.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,16 +14,16 @@
   "files": [
     "dist/",
     "docs/architecture.mermaid",
-    "docs/gmail-toolkit.api.md",
+    "docs/dev-toolkit.api.md",
     "README.md"
   ],
   "bin": {
-    "gmail-toolkit": "dist/mcp/server.js"
+    "gmail-mcp": "dist/gmail/mcp/server.js"
   },
   "scripts": {
     "prepare": "lefthook install",
-    "dev": "tsx src/mcp/server.ts",
-    "start": "node dist/mcp/server.js",
+    "dev": "tsx src/gmail/mcp/server.ts",
+    "start": "node dist/gmail/mcp/server.js",
     "setup-auth": "tsx scripts/setup-auth.ts",
     "typecheck": "tsc --noEmit",
     "prettier:fix": "prettier --write .",
@@ -48,7 +48,7 @@
     "deps:diagram:svg": "mmdc -i docs/architecture.mermaid -o docs/architecture.svg",
     "deps:diagram:update": "npm run deps:diagram:mermaid && npm run deps:diagram:svg",
     "docs": "npm run docs:update && npm run api:update && npm run deps:diagram:update",
-    "clean": "rm -rf dist logs docs/typedoc docs/architecture.mermaid docs/architecture.svg docs/gmail-toolkit.api.md",
+    "clean": "rm -rf dist logs docs/typedoc docs/architecture.mermaid docs/architecture.svg docs/dev-toolkit.api.md",
     "compile": "tsc -p tsconfig.build.json",
     "build": "npm run clean && npm run compile",
     "ci": "npm run test && npm run build"
