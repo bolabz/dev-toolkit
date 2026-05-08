@@ -8,9 +8,12 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { resolveToolRegistry, DEFAULT_TOOL_REGISTRY } from '../../../src/mcp/tool-registry.js';
-import { createMcpServer } from '../../../src/mcp/server.js';
-import type { GmailToolkit } from '../../../src/api/index.js';
+import {
+  resolveToolRegistry,
+  DEFAULT_TOOL_REGISTRY,
+} from '../../../../src/gmail/mcp/tool-registry.js';
+import { createMcpServer } from '../../../../src/gmail/mcp/server.js';
+import type { GmailToolkit } from '../../../../src/gmail/api/index.js';
 
 // ---------------------------------------------------------------------------
 // Mock Toolkit — returns canned data without hitting the Gmail API

@@ -11,7 +11,7 @@
 
 import fs from 'node:fs';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createGmailContext, type GmailContext } from '../../../src/api/context.js';
+import { createGmailContext, type GmailContext } from '../../../../src/gmail/api/context.js';
 
 const HAS_CREDENTIALS = fs.existsSync('credentials.json') && fs.existsSync('token.json');
 
