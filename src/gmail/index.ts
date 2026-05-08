@@ -1,30 +1,21 @@
 /**
- * Dev Toolkit — Public Entry Point
+ * Dev Toolkit — Gmail Module Barrel
  *
- * Namespaced module access:
+ * Usage:
  *   import { gmail } from 'dev-toolkit';
  *   const toolkit = await gmail.createGmailToolkit();
- *
- * Back-compat named import (deprecated, will be removed in next major):
- *   import { createGmailToolkit } from 'dev-toolkit';
+ *   const results = await toolkit.search('is:unread from:chase');
  */
 
-export * as gmail from './gmail/index.js';
-
-// ---------------------------------------------------------------------------
-// Back-compat re-exports — slated for removal in the next major release.
-// New code should import from the `gmail` namespace.
-// ---------------------------------------------------------------------------
+export { createGmailToolkit, type GmailToolkit } from './api/index.js';
 
 export {
-  createGmailToolkit,
   ensureAuthenticated,
   beginAuthFlow,
   MissingCredentialsError,
   AuthenticationRequiredError,
   GmailApiError,
   GmailValidationError,
-  type GmailToolkit,
   type AuthOptions,
   type PendingAuth,
   type Contact,
@@ -63,4 +54,4 @@ export {
   type ThreadMatch,
   type ReadThread,
   type ReadResult,
-} from './gmail/index.js';
+} from './infra/index.js';
