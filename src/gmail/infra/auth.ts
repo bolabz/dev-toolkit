@@ -331,9 +331,19 @@ function waitForRedirect(): Promise<string> {
 // Auth Result Page (shown in browser after consent)
 // ---------------------------------------------------------------------------
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function authResultPage(success: boolean, message: string): string {
   const color = success ? '#1a7f37' : '#cf222e';
   const icon = success ? '&#10003;' : '&#10007;';
+  const safeMessage = escapeHtml(message);
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -342,7 +352,7 @@ function authResultPage(success: boolean, message: string): string {
       <div style="text-align: center; padding: 2rem;">
         <div style="font-size: 3rem; color: ${color};">${icon}</div>
         <h1 style="color: ${color}; margin: 0.5rem 0;">${success ? 'Authorized' : 'Authorization Failed'}</h1>
-        <p style="color: #57606a; font-size: 1.1rem;">${message}</p>
+        <p style="color: #57606a; font-size: 1.1rem;">${safeMessage}</p>
       </div>
     </body>
     </html>
