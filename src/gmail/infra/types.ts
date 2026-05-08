@@ -646,4 +646,6 @@ export const GmailToolkitErrorSchema = z.object({
  */
 export type GmailToolkitError = z.infer<typeof GmailToolkitErrorSchema>;
 /** Recovery advice extracted from a GmailToolkitError. */
-export type Recovery = NonNullable<GmailToolkitError['recovery']>;
+type Recovery = NonNullable<GmailToolkitError['recovery']>;
+
+export type { Recovery };

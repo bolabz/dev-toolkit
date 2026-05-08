@@ -97,7 +97,7 @@ export default tseslint.config(
   },
   // Logger is the one file allowed to use console.error (it IS the logging layer)
   {
-    files: ['src/infra/logger.ts'],
+    files: ['src/gmail/infra/logger.ts'],
     rules: {
       'no-console': ['error', { allow: ['error'] }],
     },
