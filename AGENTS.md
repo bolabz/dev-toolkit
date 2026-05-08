@@ -6,7 +6,7 @@
 - Each module follows a **three-layer system**: Layer 1 API wrappers (`src/<module>/client/`), Layer 2 composed operations (`src/<module>/api/`), Layer 3 MCP server (`src/<module>/mcp/`).
 - Top-level entry point is `src/index.ts` — exposes the `gmail` namespace as the primary public API and re-exports deprecated named imports for one cycle.
 - Gmail module barrel is `src/gmail/index.ts` — re-exports `createGmailToolkit` from `src/gmail/api/index.ts`. MCP entry point for Gmail is `src/gmail/mcp/server.ts` (binary `gmail-mcp`).
-- Architecture source of truth is `docs/Gmail_Toolkit_Project_Spec.md` (will be generalized as additional modules join).
+- Architecture source of truth is `docs/prd/Gmail_Toolkit_Project_Spec.md` (will be generalized as additional modules join).
 - Cross-cutting infrastructure (`auth.ts`, `errors.ts`, `logger.ts`, `types.ts`) lives in `src/gmail/infra/` and is re-exported via `src/gmail/infra/index.ts` barrel. When a second module joins, genuinely shared infra will be extracted to a top-level `src/shared/`.
 
 ## How Data Flows (Most Important)

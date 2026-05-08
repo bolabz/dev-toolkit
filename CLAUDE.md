@@ -1,6 +1,6 @@
-# Gmail Toolkit
+# Dev Toolkit
 
-Three-layer TypeScript toolkit for Gmail management: standalone library + MCP server.
+Multi-module TypeScript developer toolkit for third-party SDK integrations with MCP server exposure. Each module follows a four-layer architecture (infra/client/api/mcp); the first module is Gmail.
 
 ---
 
@@ -8,14 +8,14 @@ Three-layer TypeScript toolkit for Gmail management: standalone library + MCP se
 
 - [Node.Js](package.json) - Runtime (v18+), with scripts for development, testing, building, and documentation
 - [TypeScript](tsconfig.json) - TypeScript compiler (strict mode, layered project references)
-- [TypeDoc](typedoc.json) - API documentation generation (strict JSDoc, public API focus, output to `docs/api/`)
+- [TypeDoc](typedoc.json) - API documentation generation (strict JSDoc, public API focus, output to `docs/typedoc/`)
 - [ESLint](eslint.config.js) - Code quality and style rules, including JSDoc completeness (enforced in CI)
 - [Prettier](.prettierrc) - Code formatting rules (line width, semicolons, quotes)
 - [Vitest](vitest.config.ts) - Testing framework (coverage via v8 provider)
 - [knip](knip.json) - Unused code detection configuration (checks for unused exports, files, dependencies)
 - [dependency-cruiser](.dependency-cruiser.cjs) - Enforces layered architecture with no cross-layer imports (including type-only)
 - [Mermaid Diagram](docs/architecture.mermaid) - Visual architecture diagram in Mermaid format (source of truth for architecture)
-- [API Extractor](docs/gmail-toolkit.api.md) - Generated API report from API Extractor (public types/functions)
+- [API Extractor](docs/dev-toolkit.api.md) - Generated API report from API Extractor (public types/functions)
 - [commitlint](commitlint.config.js) - Commit message linting rules (Conventional Commits standard)
 - [lefthook](lefthook.yml) - Git hooks for pre-commit formatting/linting and pre-push testing
 
@@ -23,10 +23,10 @@ Three-layer TypeScript toolkit for Gmail management: standalone library + MCP se
 
 ## Architecture Overview
 
-- [**Layer 0**: Infrastructure](src/infra) — auth, logging, types/schemas, error handling
-- [**Layer 1**: Client](src/client) - 1:1 Gmail API v1 facade with rate limiting, batching, pagination
-- [**Layer 2**: API](src/api) - Aggregated operations with label resolution, body processing, analytics
-- [**Layer 3**: MCP Server](src/mcp) - Domain-based tool modules, resources, and prompts
+- [**Layer 0**: Infrastructure](src/gmail/infra) — auth, logging, types/schemas, error handling
+- [**Layer 1**: Client](src/gmail/client) - 1:1 Gmail API v1 facade with rate limiting, batching, pagination
+- [**Layer 2**: API](src/gmail/api) - Aggregated operations with label resolution, body processing, analytics
+- [**Layer 3**: MCP Server](src/gmail/mcp) - Domain-based tool modules, resources, and prompts
 
 ---
 
@@ -46,7 +46,7 @@ npm run test           # Run test suite (vitest)
 npm run docs          # Generate documentation (TypeDoc, Mermaid architecture diagram, API report)
 
 # Build & Check
-npm run ci            # Full CI pipeline: build + API check + tests
+npm run ci            # Full CI pipeline: docs drift gate + tests + build
 ```
 
 ---

@@ -40,6 +40,16 @@ const results = await toolkit.search('is:unread from:chase');
 
 Auth resolves from `GMAIL_CREDENTIALS_PATH` and `GMAIL_TOKEN_PATH` env vars or `./credentials.json` / `./token.json` defaults. First-use OAuth is interactive; subsequent runs use the cached token.
 
+## Prerequisites
+
+- **Node.js 20+** (per `engines.node` in `package.json`).
+- **Google OAuth credentials** for the Gmail API:
+  1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project.
+  2. Enable the **Gmail API**.
+  3. Create an **OAuth 2.0 Client ID** (Desktop application).
+  4. Download the credentials JSON and save it as `./credentials.json` at the repo root (or set `GMAIL_CREDENTIALS_PATH` to its absolute path).
+- **One-time auth**: run `npm run setup-auth` to complete the interactive OAuth flow. This produces `./token.json` (or wherever `GMAIL_TOKEN_PATH` points). The MCP server cannot do interactive OAuth from inside Claude Desktop, so this step is required before configuring the MCP server.
+
 ## MCP server usage
 
 First, build and install the `gmail-mcp` binary onto your PATH (until the package is published to npm):
