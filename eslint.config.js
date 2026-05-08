@@ -156,7 +156,15 @@ export default tseslint.config(
         'error',
         {
           typed: true,
-          definedTags: ['remarks', 'typeParam', 'internal', 'packageDocumentation'],
+          definedTags: [
+            'remarks',
+            'typeParam',
+            'internal',
+            'packageDocumentation',
+            'public',
+            'beta',
+            'alpha',
+          ],
         },
       ],
 
