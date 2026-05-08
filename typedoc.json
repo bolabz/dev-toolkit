@@ -11,7 +11,7 @@
   "excludeExternals": true,
   "cleanOutputDir": true,
   "includeVersion": true,
-  "name": "Gmail Toolkit",
+  "name": "Dev Toolkit",
   "tsconfig": "./tsconfig.json",
   "sort": ["source-order", "required-first"],
   "sortEntryPoints": true,

@@ -1,9 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/index.ts", "src/mcp/server.ts"],
+  "entry": ["src/index.ts"],
   "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
-
-  "ignore": ["scripts/debug-raw-api.ts", "scripts/debug-layer2.ts", "scripts/live-test.ts"],
-  "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["mmdc"]
+  "ignoreExportsUsedInFile": true
 }

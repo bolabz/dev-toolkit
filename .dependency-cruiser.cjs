@@ -2,51 +2,62 @@
 module.exports = {
   extends: 'dependency-cruiser/configs/recommended-strict',
   forbidden: [
-    // --- Layer boundary enforcement ---
-    // Architecture: Layer 1 (client/) ← Layer 2 (api/) ← Layer 3 (mcp/)
-    // Cross-cutting modules (infra/auth, infra/errors, infra/logger, infra/types) are accessible from any layer.
+    // --- Layer boundary enforcement (within the gmail module) ---
+    // Architecture: Layer 1 (gmail/client/) ← Layer 2 (gmail/api/) ← Layer 3 (gmail/mcp/)
+    // Cross-cutting modules (gmail/infra/auth, errors, logger, types) are accessible from any layer.
     {
       name: 'layer-1-cannot-import-layer-2',
       severity: 'error',
       comment: 'Client (Layer 1) must not depend on api operations (Layer 2).',
-      from: { path: '^src/client/' },
-      to: { path: '^src/api/' },
+      from: { path: '^src/gmail/client/' },
+      to: { path: '^src/gmail/api/' },
     },
     {
       name: 'layer-1-cannot-import-layer-3',
       severity: 'error',
       comment: 'Client (Layer 1) must not depend on MCP server (Layer 3).',
-      from: { path: '^src/client/' },
-      to: { path: '^src/mcp' },
+      from: { path: '^src/gmail/client/' },
+      to: { path: '^src/gmail/mcp' },
     },
     {
       name: 'layer-2-cannot-import-layer-3',
       severity: 'error',
       comment: 'Composed operations (Layer 2) must not depend on MCP server (Layer 3).',
-      from: { path: '^src/api/' },
-      to: { path: '^src/mcp' },
+      from: { path: '^src/gmail/api/' },
+      to: { path: '^src/gmail/mcp' },
     },
     {
       name: 'layer-3-cannot-import-layer-1',
       severity: 'error',
       comment:
         'MCP server (Layer 3) must use GmailContext from Layer 2, not import Layer 1 directly.',
-      from: { path: '^src/mcp' },
-      to: { path: '^src/client/' },
+      from: { path: '^src/gmail/mcp' },
+      to: { path: '^src/gmail/client/' },
     },
     {
-      name: 'public-api-cannot-import-layer-1',
+      name: 'gmail-barrel-cannot-import-layer-1',
       severity: 'error',
-      comment: 'Public API must depend on Layer 2 (api), not Layer 1 (client) directly.',
-      from: { path: '^src/index\\.ts$' },
-      to: { path: '^src/client/' },
+      comment: 'Gmail module barrel must depend on Layer 2 (api), not Layer 1 (client) directly.',
+      from: { path: '^src/gmail/index\\.ts$' },
+      to: { path: '^src/gmail/client/' },
     },
     {
-      name: 'public-api-cannot-import-layer-3',
+      name: 'gmail-barrel-cannot-import-layer-3',
       severity: 'error',
-      comment: 'Public API must not depend on MCP server (Layer 3).',
+      comment: 'Gmail module barrel must not depend on MCP server (Layer 3).',
+      from: { path: '^src/gmail/index\\.ts$' },
+      to: { path: '^src/gmail/mcp' },
+    },
+    // --- Top-level toolkit barrel: only re-exports module barrels ---
+    // src/index.ts is the toolkit-wide entry point that exposes module namespaces.
+    // It must not reach into a module's internals — only import the module's own index.ts.
+    {
+      name: 'toolkit-barrel-must-use-module-barrel',
+      severity: 'error',
+      comment:
+        'Top-level src/index.ts must only import module barrels (e.g. src/gmail/index.ts), not module internals.',
       from: { path: '^src/index\\.ts$' },
-      to: { path: '^src/mcp' },
+      to: { path: '^src/gmail/(?!index\\.ts$)' },
     },
     // --- Barrel-only cross-layer imports ---
     // External consumers of a layer must go through the layer's index.ts (public API).
@@ -54,23 +65,24 @@ module.exports = {
     {
       name: 'no-deep-imports-into-client',
       severity: 'error',
-      comment: 'External consumers must use client/index.ts, not reach into internal modules.',
-      from: { pathNot: '^src/client/' },
-      to: { path: '^src/client/', pathNot: '^src/client/index\\.ts$' },
+      comment:
+        'External consumers must use gmail/client/index.ts, not reach into internal modules.',
+      from: { pathNot: '^src/gmail/client/' },
+      to: { path: '^src/gmail/client/', pathNot: '^src/gmail/client/index\\.ts$' },
     },
     {
       name: 'no-deep-imports-into-api',
       severity: 'error',
-      comment: 'External consumers must use api/index.ts, not reach into internal modules.',
-      from: { pathNot: '^src/api/' },
-      to: { path: '^src/api/', pathNot: '^src/api/index\\.ts$' },
+      comment: 'External consumers must use gmail/api/index.ts, not reach into internal modules.',
+      from: { pathNot: '^src/gmail/api/' },
+      to: { path: '^src/gmail/api/', pathNot: '^src/gmail/api/index\\.ts$' },
     },
     {
       name: 'no-deep-imports-into-infra',
       severity: 'error',
-      comment: 'External consumers must use infra/index.ts, not reach into internal modules.',
-      from: { pathNot: '^src/infra/' },
-      to: { path: '^src/infra/', pathNot: '^src/infra/index\\.ts$' },
+      comment: 'External consumers must use gmail/infra/index.ts, not reach into internal modules.',
+      from: { pathNot: '^src/gmail/infra/' },
+      to: { path: '^src/gmail/infra/', pathNot: '^src/gmail/infra/index\\.ts$' },
     },
     // --- Single point of contact: only context.ts bridges L2 → L1 ---
     // All other api modules receive L1 dependencies via GmailContext,
@@ -79,12 +91,12 @@ module.exports = {
       name: 'only-context-imports-client',
       severity: 'error',
       comment:
-        'Only api/context.ts may import from client/. Other api modules must receive L1 dependencies via GmailContext or loader functions.',
+        'Only gmail/api/context.ts may import from gmail/client/. Other api modules must receive L1 dependencies via GmailContext or loader functions.',
       from: {
-        path: '^src/api/',
-        pathNot: '^src/api/context\\.ts$',
+        path: '^src/gmail/api/',
+        pathNot: '^src/gmail/api/context\\.ts$',
       },
-      to: { path: '^src/client/' },
+      to: { path: '^src/gmail/client/' },
     },
   ],
   options: {
@@ -96,10 +108,10 @@ module.exports = {
     reporterOptions: {
       archi: {
         collapsePattern: [
-          '^src/client/[^/]+',
-          '^src/api/[^/]+',
-          '^src/mcp/[^/]+',
-          '^src/infra/[^/]+',
+          '^src/gmail/client/[^/]+',
+          '^src/gmail/api/[^/]+',
+          '^src/gmail/mcp/[^/]+',
+          '^src/gmail/infra/[^/]+',
           'node_modules/(@[^/]+/[^/]+|[^/]+)',
         ],
       },

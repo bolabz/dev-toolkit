@@ -7,7 +7,7 @@
   "apiReport": {
     "enabled": true,
     "reportFolder": "<projectFolder>/docs/",
-    "reportFileName": "gmail-toolkit"
+    "reportFileName": "dev-toolkit"
   },
   "docModel": {
     "enabled": false

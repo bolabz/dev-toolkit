@@ -24,7 +24,6 @@ import {
   type FilterCriteriaInput,
   type SearchCriteriaInput,
   type GmailToolkitError,
-  type Recovery,
 } from '../infra/index.js';
 import { toMcpResult, type McpToolResult } from './utils.js';
 import { resolveToolRegistry, type ToolName, type ToolConfig } from './tool-registry.js';
@@ -48,6 +47,9 @@ export { beginAuthFlow, MissingCredentialsError, AuthenticationRequiredError };
 
 export type { McpToolResult };
 export { toMcpResult };
+
+/** Recovery advice extracted from a GmailToolkitError — local to MCP layer. */
+type Recovery = NonNullable<GmailToolkitError['recovery']>;
 
 /**
  * Derive a contextual recovery strategy from an error.

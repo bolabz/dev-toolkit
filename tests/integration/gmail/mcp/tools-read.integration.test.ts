@@ -16,8 +16,8 @@ import path from 'node:path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createGmailToolkit } from '../../../src/api/index.js';
-import { createMcpServer } from '../../../src/mcp/server.js';
+import { createGmailToolkit } from '../../../../src/gmail/api/index.js';
+import { createMcpServer } from '../../../../src/gmail/mcp/server.js';
 
 const HAS_CREDENTIALS = fs.existsSync('credentials.json') && fs.existsSync('token.json');
 const SAVE_FIXTURES = process.env.SAVE_FIXTURES !== '0';
