@@ -15,7 +15,9 @@
     "dist/",
     "docs/architecture.mermaid",
     "docs/dev-toolkit.api.md",
-    "README.md"
+    "LICENSE",
+    "README.md",
+    "SECURITY.md"
   ],
   "bin": {
     "gmail-mcp": "dist/gmail/mcp/server.js"
@@ -61,7 +63,7 @@
     "google",
     "claude"
   ],
-  "license": "MIT",
+  "license": "UNLICENSED",
   "sideEffects": false,
   "engines": {
     "node": ">=20.0.0"
