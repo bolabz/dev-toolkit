@@ -1,7 +1,7 @@
 /**
  * Dev Toolkit — Public Entry Point
  *
- * Namespaced module access:
+ * Namespaced module access (primary):
  *   import { gmail } from 'dev-toolkit';
  *   const toolkit = await gmail.createGmailToolkit();
  *
@@ -11,56 +11,6 @@
 
 export * as gmail from './gmail/index.js';
 
-// ---------------------------------------------------------------------------
-// Back-compat re-exports — slated for removal in the next major release.
-// New code should import from the `gmail` namespace.
-// ---------------------------------------------------------------------------
-
-export {
-  createGmailToolkit,
-  ensureAuthenticated,
-  beginAuthFlow,
-  MissingCredentialsError,
-  AuthenticationRequiredError,
-  GmailApiError,
-  GmailValidationError,
-  type GmailToolkit,
-  type AuthOptions,
-  type PendingAuth,
-  type Contact,
-  type AttachmentInfo,
-  type DateRange,
-  type SearchResult,
-  type MessageSummary,
-  type MatchedMessageSummary,
-  type SearchSummary,
-  type FullMessage,
-  type FullThread,
-  type LabelDetail,
-  type LabelOverview,
-  type DraftDetail,
-  type DraftSummary,
-  type FilterCriteria,
-  type FilterActions,
-  type FilterDetail,
-  type FilterOverview,
-  type AccountOverview,
-  type AccountContext,
-  type ComposeMode,
-  type SearchCriteriaInput,
-  type ModifyResult,
-  type DeleteResult,
-  type DeleteLabelResult,
-  type DeleteFilterResult,
-  type SendResult,
-  type ThreadSummary,
-  type ThreadSearchResult,
-  type FilterCriteriaInput,
-  type HistoryEvent,
-  type HistoryResult,
-  type GmailToolkitError,
-  type SearchAllResult,
-  type ThreadMatch,
-  type ReadThread,
-  type ReadResult,
-} from './gmail/index.js';
+// Back-compat: re-export only the factory function and its return type.
+// All other types are reachable via the gmail namespace.
+export { createGmailToolkit, type GmailToolkit } from './gmail/index.js';
