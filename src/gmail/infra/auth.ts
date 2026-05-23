@@ -35,9 +35,38 @@ const SCOPES = [
 const DEFAULT_CREDENTIALS_PATH = process.env.GMAIL_CREDENTIALS_PATH ?? './credentials.json';
 const DEFAULT_TOKEN_PATH = process.env.GMAIL_TOKEN_PATH ?? './token.json';
 
-const REDIRECT_PORT = 3000;
+/** Fallback OAuth loopback port, used when GMAIL_OAUTH_PORT is unset or invalid. */
+const DEFAULT_REDIRECT_PORT = 3000;
+
+const REDIRECT_PORT = resolveRedirectPort();
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/oauth2callback`;
 const AUTH_TIMEOUT_MS = 120_000; // 2 minutes to complete browser consent
+
+/**
+ * Resolve the OAuth loopback redirect port from the `GMAIL_OAUTH_PORT`
+ * environment variable, falling back to the default (3000) when it is unset or
+ * not a valid TCP port (an integer in the range 1–65535).
+ *
+ * The callback server always binds to loopback (127.0.0.1) regardless of this
+ * value, so overriding the port never widens network exposure — it only avoids
+ * collisions when the default port is already in use by another process.
+ * @returns A valid TCP port number to bind the OAuth callback server to
+ */
+function resolveRedirectPort(): number {
+  const raw = process.env.GMAIL_OAUTH_PORT?.trim();
+  if (raw === undefined || raw === '') {
+    return DEFAULT_REDIRECT_PORT;
+  }
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    log.warn(
+      `Invalid GMAIL_OAUTH_PORT="${raw}" — expected an integer in 1–65535. ` +
+        `Falling back to port ${DEFAULT_REDIRECT_PORT}.`,
+    );
+    return DEFAULT_REDIRECT_PORT;
+  }
+  return parsed;
+}
 
 // ---------------------------------------------------------------------------
 // Credentials file shape (downloaded from Google Cloud Console)
