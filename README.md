@@ -49,6 +49,7 @@ Auth resolves from `GMAIL_CREDENTIALS_PATH` and `GMAIL_TOKEN_PATH` env vars or `
   3. Create an **OAuth 2.0 Client ID** (Desktop application).
   4. Download the credentials JSON and save it as `./credentials.json` at the repo root (or set `GMAIL_CREDENTIALS_PATH` to its absolute path).
 - **One-time auth**: run `npm run setup-auth` to complete the interactive OAuth flow. This produces `./token.json` (or wherever `GMAIL_TOKEN_PATH` points). The MCP server cannot do interactive OAuth from inside Claude Desktop, so this step is required before configuring the MCP server.
+- **Optional config**: copy [`.env.example`](.env.example) to `.env` for the full list of supported environment variables (credential/token paths, OAuth callback port, log level, tool gating) — all optional with sensible defaults.
 
 ## MCP server usage
 
