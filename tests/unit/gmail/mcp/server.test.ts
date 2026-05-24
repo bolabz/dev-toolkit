@@ -91,7 +91,7 @@ function createMockToolkit(): GmailToolkit {
       },
       filters: { total: 0, filters: [] },
     }),
-  } as unknown as GmailToolkit;
+  };
 }
 
 // ---------------------------------------------------------------------------
