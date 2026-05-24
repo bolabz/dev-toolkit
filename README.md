@@ -16,20 +16,28 @@ A multi-module TypeScript developer toolkit for third-party SDK integrations wit
 
 ## Architecture
 
-Each module follows the same four-layer shape:
-
-- **L0 — Infrastructure** (`src/<module>/infra/`): auth, logging, error classes, Zod schemas
-- **L1 — Client** (`src/<module>/client/`): 1:1 SDK facade with rate limiting, retries, batching, response validation
-- **L2 — API** (`src/<module>/api/`): aggregated operations, caching, body processing, analytics
-- **L3 — MCP** (`src/<module>/mcp/`): tool modules, resources, and prompts for LLM consumption
-
-Layer boundaries are enforced by `dependency-cruiser` ([config](.dependency-cruiser.cjs)). The diagram below is auto-generated from the actual import graph and re-checked on every push — it cannot drift from the code. See [docs/dev-toolkit.api.md](docs/dev-toolkit.api.md) for the public API report.
+Each module follows the same four-layer shape — **L0 Infra**, **L1 Client**, **L2 API**, **L3 MCP** — with imports flowing strictly downward, enforced by `dependency-cruiser`. The diagram below is auto-generated from the import graph, so it cannot drift from the code.
 
 <img src="docs/architecture.svg" width="800" alt="Dev Toolkit architecture (auto-generated from dependency-cruiser)">
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the layer responsibilities, invariants, control-flow diagrams, and design rationale, and [docs/dev-toolkit.api.md](docs/dev-toolkit.api.md) for the public API report.
+
 ---
 
-## Library usage (Gmail module)
+## Getting Started
+
+### Prerequisites
+
+- **Node.js 20+** (per `engines.node` in [`package.json`](package.json)).
+- **Google OAuth credentials** for the Gmail API:
+  1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project.
+  2. Enable the **Gmail API**.
+  3. Create an **OAuth 2.0 Client ID** (Desktop application).
+  4. Download the credentials JSON and save it as `./credentials.json` at the repo root (or set `GMAIL_CREDENTIALS_PATH` to its absolute path).
+- **One-time auth**: run `npm run setup-auth` to complete the interactive OAuth flow. This produces `./token.json` (or wherever `GMAIL_TOKEN_PATH` points). The MCP server cannot do interactive OAuth from inside Claude Desktop, so this step is required before configuring the MCP server.
+- **Optional config**: copy [`.env.example`](.env.example) to `.env` for the full list of supported environment variables (credential/token paths, OAuth callback port, log level, tool gating) — all optional with sensible defaults.
+
+### Library usage
 
 ```ts
 import { gmail } from 'dev-toolkit';
@@ -40,18 +48,7 @@ const results = await toolkit.search('is:unread from:chase');
 
 Auth resolves from `GMAIL_CREDENTIALS_PATH` and `GMAIL_TOKEN_PATH` env vars or `./credentials.json` / `./token.json` defaults. First-use OAuth is interactive; subsequent runs use the cached token.
 
-## Prerequisites
-
-- **Node.js 20+** (per `engines.node` in `package.json`).
-- **Google OAuth credentials** for the Gmail API:
-  1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project.
-  2. Enable the **Gmail API**.
-  3. Create an **OAuth 2.0 Client ID** (Desktop application).
-  4. Download the credentials JSON and save it as `./credentials.json` at the repo root (or set `GMAIL_CREDENTIALS_PATH` to its absolute path).
-- **One-time auth**: run `npm run setup-auth` to complete the interactive OAuth flow. This produces `./token.json` (or wherever `GMAIL_TOKEN_PATH` points). The MCP server cannot do interactive OAuth from inside Claude Desktop, so this step is required before configuring the MCP server.
-- **Optional config**: copy [`.env.example`](.env.example) to `.env` for the full list of supported environment variables (credential/token paths, OAuth callback port, log level, tool gating) — all optional with sensible defaults.
-
-## MCP server usage
+### MCP server usage
 
 First, build and install the `gmail-mcp` binary onto your PATH (until the package is published to npm):
 
@@ -79,19 +76,10 @@ Then add the Gmail MCP server to your `claude_desktop_config.json`:
 
 If you'd rather skip the global install, swap the `command` for an absolute node invocation: `"command": "node", "args": ["/absolute/path/to/dev-toolkit/dist/gmail/mcp/server.js"]`.
 
-The Gmail MCP server exposes 14 tools (4 read + 7 write + 3 destructive, with destructive disabled by default), 3 resources (`gmail://labels`, `gmail://filters`, `gmail://profile`), and 5 prompts. Tool enablement is configurable via `GMAIL_ENABLE_TOOLS` and `GMAIL_DISABLE_TOOLS` env vars.
+The Gmail MCP server exposes read, write, and destructive tools (destructive disabled by default), three resources (`gmail://labels`, `gmail://filters`, `gmail://profile`), and a set of inbox-workflow prompts. The canonical tool list and gating live in [`tool-registry.ts`](src/gmail/mcp/tool-registry.ts); enablement is configurable via `GMAIL_ENABLE_TOOLS` and `GMAIL_DISABLE_TOOLS` env vars.
 
 ---
 
 ## Development
 
-```bash
-npm install
-npm run setup-auth        # one-time OAuth flow
-npm run dev               # tsx-driven MCP server with live reload
-npm run test              # full check + unit tests
-npm run test:integration  # live Gmail API tests (requires credentials)
-npm run ci                # full pipeline: check + tests + build
-```
-
-For internal architecture, layer dependency rules, and conventions, see [AGENTS.md](AGENTS.md).
+For the codebase structure and design rationale, see [ARCHITECTURE.md](ARCHITECTURE.md); for setup, conventions, testing, and the daily command workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
