@@ -60,7 +60,7 @@ function resolveRedirectPort(): number {
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
     log.warn(
-      `Invalid GMAIL_OAUTH_PORT="${raw}" — expected an integer in 1–65535. ` +
+      `Invalid GMAIL_OAUTH_PORT — expected an integer in 1–65535. ` +
         `Falling back to port ${DEFAULT_REDIRECT_PORT}.`,
     );
     return DEFAULT_REDIRECT_PORT;
