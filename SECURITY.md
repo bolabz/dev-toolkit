@@ -32,7 +32,7 @@ You can expect:
 
 Only the latest commit on the `main` branch receives security updates. This
 project is currently published as a personal portfolio artifact and is **not
-intended for production use** — see `LICENSE` for terms.
+intended for production use** — see [LICENSE](LICENSE) for terms.
 
 ## Threat Model
 
