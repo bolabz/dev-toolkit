@@ -8,8 +8,12 @@ output:
   - execution_out
 
 # ── Pre-commit ────────────────────────────────────────────────────────
-# Fast fix/check for cleanliness — format + lint staged files only.
-# Doc generation happens at build time, validated at push time.
+# Required auto-fix + early verify (fixing is enforced here, not opt-in):
+# knip --fix → eslint --fix → prettier → deps → links → typecheck → typedoc →
+# diagram. Fixers run first and re-stage; the checks are fail-fast; the diagram
+# regenerates (and stages) only if everything passed. Piped: stops at first failure.
+# A failure means the autofixer already ran and couldn't resolve it — the
+# fail_text points at manual resolution, not at re-running the same fixer.
 
 pre-commit:
   piped: true
@@ -17,22 +21,54 @@ pre-commit:
     - merge
     - rebase
   commands:
-    prettier:
+    knip:
       priority: 1
-      glob: "**/*.{ts,tsx,js,json,md,yml,yaml}"
-      run: npx prettier --write {staged_files}
+      glob: "**/*.{ts,tsx,json}"
+      run: npx knip --fix
       stage_fixed: true
-      fail_text: "Prettier formatting failed. Run `npm run prettier:fix` to fix."
+      fail_text: "Unused code remains that knip can't auto-remove."
     eslint:
       priority: 2
       glob: "**/*.{ts,tsx}"
       run: npx eslint --max-warnings 0 --fix {staged_files}
       stage_fixed: true
-      fail_text: "ESLint check failed. Run `npm run lint:fix` to fix."
+      fail_text: "ESLint auto-fixed what it could; the errors above have no autofix."
+    prettier:
+      priority: 3
+      glob: "**/*.{ts,tsx,js,json,md,yml,yaml}"
+      run: npx prettier --write {staged_files}
+      stage_fixed: true
+      fail_text: "Prettier could not parse a file — fix the syntax error shown above."
+    deps:
+      priority: 4
+      glob: "src/**/*.{ts,tsx}"
+      run: npm run deps:check
+      fail_text: "Layer-boundary violation above (see .dependency-cruiser.cjs)."
+    links:
+      priority: 5
+      glob: "**/*.{md,ts,tsx}"
+      run: npm run docs:links
+      fail_text: "A Markdown link or heading anchor above doesn't resolve."
+    typecheck:
+      priority: 6
+      glob: "**/*.{ts,tsx}"
+      run: npx tsc --noEmit
+      fail_text: "Type errors above must be resolved before committing."
+    typedoc:
+      priority: 7
+      glob: "**/*.{ts,tsx}"
+      run: npm run docs:check
+      fail_text: "typedoc validation failed above (missing/invalid JSDoc)."
+    diagram:
+      priority: 8
+      glob: "src/**/*.{ts,tsx}"
+      run: npm run deps:diagram:update && git add docs/architecture.mermaid docs/architecture.svg
+      fail_text: "Architecture diagram regeneration failed (dependency-cruiser/mmdc)."
+
 
 # ── Pre-push ──────────────────────────────────────────────────────────
-# Pre-flight check mirroring the CI pipeline.
-# Piped: compile first (dist/ needed for api:check), then validate.
+# Pre-flight check mirroring the CI pipeline: runs `npm run ci`
+# (audit → docs:fresh → test → build → api:fresh; build precedes api:fresh).
 
 pre-push:
   piped: true
