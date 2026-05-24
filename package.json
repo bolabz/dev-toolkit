@@ -37,8 +37,9 @@
     "knip:check": "knip",
     "deps:check": "depcruise src --config .dependency-cruiser.cjs",
     "docs:check": "typedoc --emit none",
+    "docs:links": "remark --frail --quiet README.md ARCHITECTURE.md CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md AGENTS.md",
     "format:check": "npm run prettier:check && npm run lint:check",
-    "check": "npm run fix && npm run typecheck && npm run format:check && npm run docs:check && npm run deps:check && npm run knip:check",
+    "check": "npm run typecheck && npm run format:check && npm run docs:check && npm run docs:links && npm run deps:check && npm run knip:check",
     "test:unit": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
@@ -46,6 +47,7 @@
     "test": "npm run check && npm run test:unit",
     "docs:update": "typedoc",
     "api:update": "api-extractor run --config api-extractor.json --local",
+    "api:fresh": "npm run api:update && git diff --exit-code HEAD -- docs/dev-toolkit.api.md",
     "deps:diagram:mermaid": "depcruise src --config .dependency-cruiser.cjs --output-type mermaid --output-to docs/architecture.mermaid",
     "deps:diagram:svg": "mmdc -i docs/architecture.mermaid -o docs/architecture.svg",
     "deps:diagram:update": "npm run deps:diagram:mermaid && npm run deps:diagram:svg",
@@ -54,7 +56,8 @@
     "clean": "rm -rf dist logs docs/typedoc",
     "compile": "tsc -p tsconfig.build.json",
     "build": "npm run clean && npm run compile",
-    "ci": "npm run docs:fresh && npm run test && npm run build"
+    "audit": "npm audit --audit-level=moderate",
+    "ci": "npm run audit && npm run docs:fresh && npm run test && npm run build && npm run api:fresh"
   },
   "keywords": [
     "gmail",
@@ -97,6 +100,8 @@
     "knip": "^6.3.1",
     "lefthook": "^2.1.5",
     "prettier": "^3.8.2",
+    "remark-cli": "^12.0.1",
+    "remark-validate-links": "^13.1.0",
     "tsx": "^4.19.0",
     "typedoc": "^0.28.18",
     "typescript": "^6.0.0",
